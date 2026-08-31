@@ -2,11 +2,14 @@ import { ConflictError } from '../lib/errors'
 import { supabase } from '../lib/supabase'
 import type {
   Category,
+  GroceryItem,
+  GroceryItemInput,
   Household,
   HouseholdContext,
   HouseholdMember,
   InventoryItem,
   ItemInput,
+  PurchaseInput,
   Profile,
   StorageLocation,
 } from '../types/database'
@@ -17,6 +20,7 @@ export const queryKeys = {
   categories: (householdId: string) => ['categories', householdId] as const,
   locations: (householdId: string) => ['locations', householdId] as const,
   members: (householdId: string) => ['members', householdId] as const,
+  groceries: (householdId: string) => ['groceries', householdId] as const,
 }
 
 function unwrap<T>(data: T | null, error: { message: string } | null): T {
@@ -70,6 +74,15 @@ export async function fetchLocations(householdId: string): Promise<StorageLocati
   return data ?? []
 }
 
+export async function fetchGroceries(householdId: string): Promise<GroceryItem[]> {
+  const { data, error } = await supabase
+    .from('grocery_items')
+    .select('*, category:categories(id,name), inventory_item:inventory_items(id,name,quantity,unit,low_stock_threshold)')
+    .eq('household_id', householdId)
+  if (error) throw new Error(error.message)
+  return (data ?? []) as unknown as GroceryItem[]
+}
+
 export async function fetchMembers(householdId: string): Promise<HouseholdMember[]> {
   const { data, error } = await supabase
     .from('household_members')
@@ -115,6 +128,75 @@ export async function deleteInventoryItem(item: InventoryItem) {
     .maybeSingle()
   if (error) throw new Error(error.message)
   if (!data) throw new ConflictError('This item changed or was already removed.')
+}
+
+function throwRpcError(error: { code?: string; message: string } | null) {
+  if (!error) return
+  if (error.code === '40001') throw new ConflictError(error.message)
+  throw new Error(error.message)
+}
+
+export async function createGroceryItem(input: GroceryItemInput) {
+  const { data, error } = await supabase.rpc('create_grocery_item', {
+    linked_inventory_item_id: input.inventory_item_id,
+    item_name: input.name,
+    item_quantity: input.quantity,
+    item_unit: input.unit,
+    item_category_id: input.category_id,
+    item_notes: input.notes,
+  })
+  throwRpcError(error)
+  return unwrap(data?.[0] ?? null, null)
+}
+
+export async function updateGroceryItem(item: GroceryItem, input: GroceryItemInput) {
+  const { error } = await supabase.rpc('update_grocery_item', {
+    grocery_id: item.id,
+    expected_version: item.version,
+    linked_inventory_item_id: input.inventory_item_id,
+    item_name: input.name,
+    item_quantity: input.quantity,
+    item_unit: input.unit,
+    item_category_id: input.category_id,
+    item_notes: input.notes,
+  })
+  throwRpcError(error)
+}
+
+export async function deleteGroceryItem(item: GroceryItem) {
+  const { error } = await supabase.rpc('delete_grocery_item', {
+    grocery_id: item.id,
+    expected_version: item.version,
+  })
+  throwRpcError(error)
+}
+
+export async function completeGroceryItem(item: GroceryItem, input: PurchaseInput) {
+  const { data, error } = await supabase.rpc('complete_grocery_item', {
+    grocery_id: item.id,
+    expected_version: item.version,
+    stock_action: input.stock_action,
+    purchased_quantity: input.quantity,
+    purchased_unit: input.unit,
+    target_inventory_item_id: input.target_inventory_item_id,
+    new_location_id: input.new_location_id,
+  })
+  throwRpcError(error)
+  return unwrap(data?.[0] ?? null, null)
+}
+
+export async function repeatGroceryItem(item: GroceryItem) {
+  const { data, error } = await supabase.rpc('repeat_grocery_item', {
+    grocery_id: item.id,
+  })
+  throwRpcError(error)
+  return unwrap(data?.[0] ?? null, null)
+}
+
+export async function clearGroceryHistory() {
+  const { data, error } = await supabase.rpc('clear_grocery_history')
+  throwRpcError(error)
+  return data ?? 0
 }
 
 export async function createHousehold(name: string) {

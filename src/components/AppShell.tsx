@@ -1,7 +1,8 @@
-import { Boxes, LogOut, Settings } from 'lucide-react'
+import { Boxes, LogOut, Settings, ShoppingCart } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../auth/AuthContext'
+import { fetchGroceries, queryKeys } from '../api/kitchen'
 import { useHouseholdRealtime } from '../hooks/useHousehold'
 import { supabase } from '../lib/supabase'
 import type { HouseholdContext } from '../types/database'
@@ -17,6 +18,12 @@ export function AppShell({
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   useHouseholdRealtime(context.household.id)
+  const groceries = useQuery({
+    queryKey: queryKeys.groceries(context.household.id),
+    queryFn: () => fetchGroceries(context.household.id),
+  })
+  const activeGroceries = (groceries.data ?? []).filter((item) => item.status === 'active')
+  const lowStockGroceries = activeGroceries.filter((item) => item.source === 'low_stock').length
 
   async function signOut() {
     await supabase.auth.signOut()
@@ -38,6 +45,12 @@ export function AppShell({
           <NavLink to="/inventory">
             <Boxes size={18} />
             <span>Inventory</span>
+          </NavLink>
+          <NavLink to="/grocery">
+            <ShoppingCart size={18} />
+            <span>Groceries</span>
+            {activeGroceries.length ? <b className="nav-count">{activeGroceries.length}</b> : null}
+            {lowStockGroceries ? <span className="sr-only">{lowStockGroceries} low-stock items</span> : null}
           </NavLink>
           <NavLink to="/settings">
             <Settings size={18} />
@@ -61,4 +74,3 @@ export function AppShell({
     </div>
   )
 }
-

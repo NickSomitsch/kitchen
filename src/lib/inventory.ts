@@ -2,6 +2,7 @@ import type {
   InventoryFilters,
   InventoryItem,
   InventorySort,
+  GroceryItem,
   Unit,
 } from '../types/database'
 
@@ -63,6 +64,45 @@ export function formatJoinCode(code: string) {
     : normalized
 }
 
+export function isLowStock(item: Pick<InventoryItem, 'quantity' | 'low_stock_threshold'>) {
+  return item.low_stock_threshold !== null && item.quantity <= item.low_stock_threshold
+}
+
+export function findGroceryDuplicate(items: GroceryItem[], name: string, excludedId?: string) {
+  const normalized = name.trim().toLocaleLowerCase()
+  if (!normalized) return undefined
+  return items.find(
+    (item) => item.status === 'active' && item.id !== excludedId &&
+      item.name.trim().toLocaleLowerCase() === normalized,
+  )
+}
+
+export function groupActiveGroceries(items: GroceryItem[]) {
+  const groups = new Map<string, { id: string | null; name: string; items: GroceryItem[] }>()
+  items
+    .filter((item) => item.status === 'active')
+    .forEach((item) => {
+      const key = item.category_id ?? '__uncategorized__'
+      const group = groups.get(key) ?? {
+        id: item.category_id,
+        name: item.category?.name ?? 'Uncategorized',
+        items: [],
+      }
+      group.items.push(item)
+      groups.set(key, group)
+    })
+  return [...groups.values()]
+    .map((group) => ({
+      ...group,
+      items: group.items.sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: 'base' })),
+    }))
+    .sort((left, right) => {
+      if (left.id === null) return 1
+      if (right.id === null) return -1
+      return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' })
+    })
+}
+
 export function findDuplicate(
   items: InventoryItem[],
   name: string,
@@ -102,6 +142,7 @@ export function filterAndSortInventory(
     if (filters.units.length && !filters.units.includes(item.unit)) return false
     if (filters.stock === 'in-stock' && item.quantity === 0) return false
     if (filters.stock === 'out-of-stock' && item.quantity !== 0) return false
+    if (filters.stock === 'low-stock' && !isLowStock(item)) return false
     return true
   })
 
@@ -131,4 +172,3 @@ export function filterAndSortInventory(
     return sort.direction === 'asc' ? result : -result
   })
 }
-

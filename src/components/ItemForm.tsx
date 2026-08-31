@@ -56,11 +56,15 @@ export function ItemForm({
       categoryId: item?.category_id ?? '',
       locationId: item?.location_id ?? '',
       notes: item?.notes ?? '',
+      lowStockEnabled: item?.low_stock_threshold !== null && item?.low_stock_threshold !== undefined,
+      lowStockThreshold: item?.low_stock_threshold ?? 0,
     },
   })
 
   const name = useWatch({ control, name: 'name' })
   const notes = useWatch({ control, name: 'notes' })
+  const lowStockEnabled = useWatch({ control, name: 'lowStockEnabled' })
+  const selectedUnit = useWatch({ control, name: 'unit' })
   const duplicate = useMemo(
     () => findDuplicate(items, name, item?.id),
     [items, name, item?.id],
@@ -75,6 +79,7 @@ export function ItemForm({
         category_id: values.categoryId || null,
         location_id: values.locationId || null,
         notes: values.notes.trim() || null,
+        low_stock_threshold: values.lowStockEnabled ? values.lowStockThreshold : null,
       }
       if (item) return updateInventoryItem(item, input)
       return createInventoryItem(householdId, user!.id, input)
@@ -89,13 +94,21 @@ export function ItemForm({
     const from = getValues('unit')
     const to = event.target.value as Unit
     const quantity = getValues('quantity')
+    const threshold = getValues('lowStockThreshold')
     setValue('unit', to, { shouldDirty: true, shouldValidate: true })
     if (from === to) return
     const converted = convertQuantity(quantity, from, to)
     if (converted === null) {
       setValue('quantity', Number.NaN, { shouldDirty: true, shouldValidate: true })
+      if (getValues('lowStockEnabled')) {
+        setValue('lowStockThreshold', Number.NaN, { shouldDirty: true, shouldValidate: true })
+      }
     } else {
       setValue('quantity', converted, { shouldDirty: true, shouldValidate: true })
+      if (getValues('lowStockEnabled')) {
+        const convertedThreshold = convertQuantity(threshold, from, to)
+        setValue('lowStockThreshold', convertedThreshold ?? Number.NaN, { shouldDirty: true, shouldValidate: true })
+      }
     }
   }
 
@@ -145,6 +158,19 @@ export function ItemForm({
           <textarea rows={3} {...register('notes')} placeholder="Brand, variety, or anything useful…" />
           <div className="field-meta"><FieldError message={errors.notes?.message} /><span>{notes.length}/500</span></div>
         </label>
+        <div className="low-stock-rule full-width">
+          <label className="check-row">
+            <input type="checkbox" {...register('lowStockEnabled')} />
+            <span><strong>Low-stock rule</strong><small>Automatically add this item to Groceries when its quantity reaches the threshold.</small></span>
+          </label>
+          {lowStockEnabled ? (
+            <label className="field low-stock-threshold">
+              <span>Trigger at or below ({selectedUnit})</span>
+              <input type="number" min="0" max="999999999.999" step="0.001" inputMode="decimal" {...register('lowStockThreshold', { valueAsNumber: true })} />
+              <FieldError message={errors.lowStockThreshold?.message} />
+            </label>
+          ) : null}
+        </div>
       </div>
       {mutation.isError ? (
         mutation.error instanceof ConflictError ? (

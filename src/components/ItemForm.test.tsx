@@ -28,6 +28,7 @@ function inventoryItem(overrides: Partial<InventoryItem> = {}): InventoryItem {
     category_id: null,
     location_id: null,
     notes: null,
+    low_stock_threshold: null,
     created_by: 'user-1',
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
@@ -63,6 +64,13 @@ describe('ItemForm', () => {
     expect(screen.getByLabelText(/Quantity/)).toHaveValue(1000)
   })
 
+  it('converts a configured low-stock threshold with the item unit', async () => {
+    const user = userEvent.setup()
+    renderForm(inventoryItem({ low_stock_threshold: 0.5 }))
+    await user.selectOptions(screen.getByLabelText(/Unit/), 'g')
+    expect(screen.getByLabelText(/Trigger at or below/)).toHaveValue(500)
+  })
+
   it('clears quantity when changing to an incompatible unit family', async () => {
     const user = userEvent.setup()
     renderForm(inventoryItem({ quantity: 2, unit: 'piece' }))
@@ -79,4 +87,3 @@ describe('ItemForm', () => {
     expect(screen.getByRole('button', { name: /Add to inventory/ })).toBeEnabled()
   })
 })
-

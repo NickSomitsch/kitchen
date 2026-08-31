@@ -8,6 +8,7 @@ import { isSupabaseConfigured } from './lib/supabase'
 
 const AuthPage = lazy(() => import('./pages/AuthPage').then((module) => ({ default: module.AuthPage })))
 const InventoryPage = lazy(() => import('./pages/InventoryPage').then((module) => ({ default: module.InventoryPage })))
+const GroceryPage = lazy(() => import('./pages/GroceryPage').then((module) => ({ default: module.GroceryPage })))
 const OnboardingPage = lazy(() => import('./pages/OnboardingPage').then((module) => ({ default: module.OnboardingPage })))
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then((module) => ({ default: module.SettingsPage })))
 
@@ -65,6 +66,10 @@ export function App() {
               <Route
                 path="/inventory"
                 element={<ProtectedRoute><InventoryPage /></ProtectedRoute>}
+              />
+              <Route
+                path="/grocery"
+                element={<ProtectedRoute><GroceryPage /></ProtectedRoute>}
               />
               <Route
                 path="/settings"

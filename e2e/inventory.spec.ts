@@ -76,6 +76,36 @@ test('two members share live inventory while another household stays isolated', 
     const firstItem = first.locator('.inventory-table-wrap:visible tr, .inventory-card:visible').filter({ hasText: 'Realtime rice' })
     await expect(firstItem.getByText('2.5 kg')).toBeVisible({ timeout: 10_000 })
 
+    await firstItem.getByRole('button').first().click()
+    const thresholdDialog = first.getByRole('dialog', { name: 'Edit inventory item' })
+    await thresholdDialog.getByLabel(/Low-stock rule/).check()
+    await thresholdDialog.getByLabel(/Trigger at or below/).fill('3')
+    await thresholdDialog.getByRole('button', { name: 'Save changes' }).click()
+
+    await second.getByRole('link', { name: /Groceries/ }).click()
+    const automaticGrocery = second.locator('.grocery-row').filter({ hasText: 'Realtime rice' })
+    await expect(automaticGrocery.getByText('Automatic')).toBeVisible({ timeout: 10_000 })
+    await automaticGrocery.getByRole('button', { name: 'Mark Realtime rice purchased' }).click()
+    const purchaseDialog = second.getByRole('dialog', { name: 'Purchased Realtime rice?' })
+    await purchaseDialog.getByLabel(/Purchased quantity/).fill('1')
+    await purchaseDialog.getByRole('button', { name: 'Mark purchased' }).click()
+    await expect(firstItem.getByText('3.5 kg')).toBeVisible({ timeout: 10_000 })
+    await expect(automaticGrocery).not.toBeVisible({ timeout: 10_000 })
+
+    await second.getByLabel('Quick-add grocery').fill('Dish soap')
+    await second.getByRole('button', { name: 'Add', exact: true }).click()
+    const soap = second.locator('.grocery-row').filter({ hasText: 'Dish soap' })
+    await expect(soap).toBeVisible()
+    await soap.getByRole('button', { name: 'Mark Dish soap purchased' }).click()
+    const soapDialog = second.getByRole('dialog', { name: 'Purchased Dish soap?' })
+    await soapDialog.getByRole('radio', { name: /Complete without stocking/ }).check()
+    await soapDialog.getByRole('button', { name: 'Mark purchased' }).click()
+    await second.getByText('Recently purchased').click()
+    const soapHistory = second.locator('.history-list article').filter({ hasText: 'Dish soap' })
+    await expect(soapHistory.getByText('Not stocked', { exact: false })).toBeVisible()
+    await soapHistory.getByRole('button', { name: /Add again/ }).click()
+    await expect(second.locator('.grocery-row').filter({ hasText: 'Dish soap' })).toBeVisible()
+
     await first.getByPlaceholder('Search your kitchen…').fill('not present')
     await expect(first.getByRole('heading', { name: 'No items match' })).toBeVisible()
     await first.getByRole('button', { name: 'Clear filters' }).click()
@@ -86,12 +116,23 @@ test('two members share live inventory while another household stays isolated', 
     await isolated.getByRole('button', { name: 'Create my household' }).click()
     await expect(isolated.locator('.inventory-table-wrap:visible tr, .inventory-card:visible').filter({ hasText: 'Realtime rice' })).not.toBeVisible()
     await expect(isolated.getByRole('heading', { name: 'Your kitchen is ready to fill' })).toBeVisible()
+    await isolated.getByRole('link', { name: /Groceries/ }).click()
+    await expect(isolated.getByRole('heading', { name: 'Your grocery list is clear' })).toBeVisible()
 
+    await second.getByRole('link', { name: 'Inventory', exact: true }).click()
     const deleteTarget = second.locator('.inventory-table-wrap:visible tr, .inventory-card:visible').filter({ hasText: 'Realtime rice' })
+    await expect(deleteTarget).toBeVisible()
     const cardMenu = deleteTarget.locator('summary')
-    if (await cardMenu.isVisible()) await cardMenu.click()
-    await deleteTarget.getByRole('button', { name: /Delete/ }).click()
-    await second.getByRole('button', { name: 'Delete permanently' }).click()
+    if (await cardMenu.isVisible()) {
+      await cardMenu.click()
+      await deleteTarget.getByRole('button', { name: 'Delete', exact: true }).click()
+    } else {
+      await deleteTarget.getByRole('button', { name: 'Delete Realtime rice' }).click()
+    }
+    const deleteDialog = second.getByRole('dialog', { name: 'Delete Realtime rice?' })
+    await expect(deleteDialog).toBeVisible()
+    await deleteDialog.getByRole('button', { name: 'Delete permanently' }).click()
+    await expect(deleteDialog).not.toBeVisible({ timeout: 10_000 })
     await expect(firstItem).not.toBeVisible({ timeout: 10_000 })
   } finally {
     const url = process.env.VITE_SUPABASE_URL

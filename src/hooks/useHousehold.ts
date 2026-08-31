@@ -25,10 +25,21 @@ export function useHouseholdRealtime(householdId: string | undefined) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.categories(householdId) })
       void queryClient.invalidateQueries({ queryKey: queryKeys.locations(householdId) })
       void queryClient.invalidateQueries({ queryKey: queryKeys.members(householdId) })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.groceries(householdId) })
     }
 
     const channel = supabase
       .channel(`household:${householdId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'grocery_items',
+          filter: `household_id=eq.${householdId}`,
+        },
+        refreshHousehold,
+      )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'households', filter: `id=eq.${householdId}` },
@@ -81,4 +92,3 @@ export function useHouseholdRealtime(householdId: string | undefined) {
     }
   }, [householdId, queryClient])
 }
-

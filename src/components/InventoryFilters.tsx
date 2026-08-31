@@ -112,6 +112,7 @@ export function InventoryFilters({
             <option value="all">All stock</option>
             <option value="in-stock">In stock</option>
             <option value="out-of-stock">Out of stock</option>
+            <option value="low-stock">Low stock</option>
           </select>
         </label>
         <div className="toolbar-spacer" />
@@ -147,4 +148,3 @@ export function InventoryFilters({
     </section>
   )
 }
-

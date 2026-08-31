@@ -59,6 +59,7 @@ export interface Database {
           category_id?: string | null
           location_id?: string | null
           notes?: string | null
+          low_stock_threshold?: number | null
           created_by: string
         }
         Update: {
@@ -68,7 +69,14 @@ export interface Database {
           category_id?: string | null
           location_id?: string | null
           notes?: string | null
+          low_stock_threshold?: number | null
         }
+        Relationships: []
+      }
+      grocery_items: {
+        Row: GroceryItemRow
+        Insert: never
+        Update: never
         Relationships: []
       }
     }
@@ -96,9 +104,61 @@ export interface Database {
         Args: { confirmation_name: string }
         Returns: undefined
       }
+      create_grocery_item: {
+        Args: {
+          linked_inventory_item_id?: string | null
+          item_name?: string | null
+          item_quantity?: number | null
+          item_unit?: Unit | null
+          item_category_id?: string | null
+          item_notes?: string | null
+        }
+        Returns: { grocery_item_id: string; created: boolean }[]
+      }
+      update_grocery_item: {
+        Args: {
+          grocery_id: string
+          expected_version: number
+          linked_inventory_item_id?: string | null
+          item_name?: string | null
+          item_quantity?: number | null
+          item_unit?: Unit | null
+          item_category_id?: string | null
+          item_notes?: string | null
+        }
+        Returns: undefined
+      }
+      delete_grocery_item: {
+        Args: { grocery_id: string; expected_version: number }
+        Returns: undefined
+      }
+      complete_grocery_item: {
+        Args: {
+          grocery_id: string
+          expected_version: number
+          stock_action: StockAction
+          purchased_quantity?: number | null
+          purchased_unit?: Unit | null
+          target_inventory_item_id?: string | null
+          new_location_id?: string | null
+        }
+        Returns: {
+          completed_grocery_item_id: string
+          stocked_inventory_item_id: string | null
+        }[]
+      }
+      repeat_grocery_item: {
+        Args: { grocery_id: string }
+        Returns: { grocery_item_id: string; created: boolean }[]
+      }
+      clear_grocery_history: { Args: Record<string, never>; Returns: number }
       shares_household: { Args: { other_user_id: string }; Returns: boolean }
     }
-    Enums: { inventory_unit: Unit }
+    Enums: {
+      inventory_unit: Unit
+      grocery_item_source: GroceryItemSource
+      grocery_item_status: GroceryItemStatus
+    }
     CompositeTypes: Record<string, never>
   }
 }
@@ -154,6 +214,7 @@ export interface InventoryItemRow {
   category_id: string | null
   location_id: string | null
   notes: string | null
+  low_stock_threshold: number | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -165,7 +226,53 @@ export interface InventoryItem extends InventoryItemRow {
   location: Pick<StorageLocation, 'id' | 'name'> | null
 }
 
-export type StockFilter = 'all' | 'in-stock' | 'out-of-stock'
+export type GroceryItemSource = 'manual' | 'low_stock'
+export type GroceryItemStatus = 'active' | 'purchased'
+export type StockAction = 'none' | 'existing' | 'new'
+
+export interface GroceryItemRow {
+  id: string
+  household_id: string
+  inventory_item_id: string | null
+  name: string
+  quantity: number | null
+  unit: Unit | null
+  category_id: string | null
+  notes: string | null
+  source: GroceryItemSource
+  status: GroceryItemStatus
+  stocked: boolean
+  created_by: string | null
+  completed_by: string | null
+  completed_at: string | null
+  created_at: string
+  updated_at: string
+  version: number
+}
+
+export interface GroceryItem extends GroceryItemRow {
+  category: Pick<Category, 'id' | 'name'> | null
+  inventory_item: Pick<InventoryItemRow, 'id' | 'name' | 'quantity' | 'unit' | 'low_stock_threshold'> | null
+}
+
+export interface GroceryItemInput {
+  inventory_item_id: string | null
+  name: string
+  quantity: number | null
+  unit: Unit | null
+  category_id: string | null
+  notes: string | null
+}
+
+export interface PurchaseInput {
+  stock_action: StockAction
+  quantity: number | null
+  unit: Unit | null
+  target_inventory_item_id: string | null
+  new_location_id: string | null
+}
+
+export type StockFilter = 'all' | 'in-stock' | 'out-of-stock' | 'low-stock'
 export type InventorySortField = 'name' | 'quantity' | 'category' | 'location' | 'updated_at'
 export type SortDirection = 'asc' | 'desc'
 
@@ -194,5 +301,5 @@ export interface ItemInput {
   category_id: string | null
   location_id: string | null
   notes: string | null
+  low_stock_threshold: number | null
 }
-

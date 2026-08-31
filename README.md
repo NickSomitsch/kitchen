@@ -1,6 +1,6 @@
 # Kitchen Inventory
 
-A mobile-first shared kitchen inventory. Household members can manage quantities, categories, and storage locations together, with live updates across devices.
+A mobile-first shared kitchen inventory and grocery list. Household members can track what is on hand, automatically surface low-stock items, and shop together with live updates across devices.
 
 ## Features
 
@@ -10,6 +10,11 @@ A mobile-first shared kitchen inventory. Household members can manage quantities
 - Safe mass and volume conversion when changing units
 - Shared categories and storage locations
 - Out-of-stock tracking, duplicate warnings, and concurrent-edit protection
+- One shared grocery list grouped by category
+- Linked inventory groceries and flexible free-form entries
+- Optional low-stock thresholds that create and resolve grocery entries automatically
+- Purchase review that can restock an existing item, create a new item, or complete without stocking
+- Persistent purchase history with “add again” and clear-history controls
 - Responsive phone cards and desktop table
 - Supabase Row Level Security and Realtime synchronization
 
@@ -46,7 +51,7 @@ RUN_E2E=1 npm run test:e2e
 npm run build
 ```
 
-Database and browser tests require the local Supabase stack to be running. The browser test creates temporary users and households in the local database.
+Database and browser tests require the local Supabase stack to be running. The browser test creates temporary users and households, exercises inventory and grocery collaboration at desktop and mobile sizes, and removes all synthetic data afterward.
 Maintainers can also run `npm run test:hosted` with the three server-side Supabase environment variables documented by the script; it removes all synthetic data in a `finally` block.
 
 ## Deployment
@@ -60,4 +65,4 @@ Pushing `main` verifies the app and deploys `dist/` to GitHub Pages. The publish
 
 ## Next milestones
 
-Grocery lists and low-stock rules; offline/PWA support; barcode and photo recognition; nutrition data; recipe matching and meal planning.
+Offline/PWA support; barcode and photo recognition; nutrition data; recipe matching and meal planning; optional stores, prices, and shopping routes.

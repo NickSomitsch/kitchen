@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import type { InventoryFilters, InventoryItem, Unit } from '../types/database'
+import type { GroceryItem, InventoryFilters, InventoryItem, Unit } from '../types/database'
 import {
   convertQuantity,
   filterAndSortInventory,
   findDuplicate,
+  findGroceryDuplicate,
   formatJoinCode,
+  groupActiveGroceries,
+  isLowStock,
   normalizedQuantity,
 } from './inventory'
 
@@ -24,12 +27,38 @@ function item(
     category_id: null,
     location_id: null,
     notes: null,
+    low_stock_threshold: null,
     created_by: 'user-1',
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
     version: 1,
     category: null,
     location: null,
+    ...overrides,
+  }
+}
+
+function grocery(id: string, name: string, overrides: Partial<GroceryItem> = {}): GroceryItem {
+  return {
+    id,
+    household_id: 'household-1',
+    inventory_item_id: null,
+    name,
+    quantity: null,
+    unit: null,
+    category_id: null,
+    notes: null,
+    source: 'manual',
+    status: 'active',
+    stocked: false,
+    created_by: 'user-1',
+    completed_by: null,
+    completed_at: null,
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+    version: 1,
+    category: null,
+    inventory_item: null,
     ...overrides,
   }
 }
@@ -111,12 +140,41 @@ describe('inventory search and filters', () => {
     expect(result.map((entry) => entry.name)).toEqual(['Milk'])
   })
 
+  it('identifies and filters configured low stock, including zero thresholds', () => {
+    const configured = item('4', 'Oil', 0, 'l', { low_stock_threshold: 0 })
+    expect(isLowStock(configured)).toBe(true)
+    expect(isLowStock(item('5', 'Salt', 0, 'g'))).toBe(false)
+    const result = filterAndSortInventory([...inventory, configured], { ...emptyFilters, stock: 'low-stock' }, { field: 'name', direction: 'asc' })
+    expect(result.map((entry) => entry.name)).toEqual(['Oil'])
+  })
+
   it('sorts every supported field and direction deterministically', () => {
     expect(filterAndSortInventory(inventory, emptyFilters, { field: 'name', direction: 'desc' })[0].name).toBe('Milk')
     expect(filterAndSortInventory(inventory, emptyFilters, { field: 'category', direction: 'asc' })[0].name).toBe('Eggs')
     expect(filterAndSortInventory(inventory, emptyFilters, { field: 'location', direction: 'asc' })[0].name).toBe('Basmati rice')
     expect(filterAndSortInventory(inventory, emptyFilters, { field: 'updated_at', direction: 'asc' })).toHaveLength(3)
     expect(filterAndSortInventory(inventory, emptyFilters, { field: 'quantity', direction: 'asc' }).map((entry) => entry.name)).toEqual(['Basmati rice', 'Milk', 'Eggs'])
+  })
+})
+
+describe('grocery helpers', () => {
+  const groceries = [
+    grocery('1', 'Milk', { category_id: 'dairy', category: { id: 'dairy', name: 'Dairy' } }),
+    grocery('2', 'Apples', { category_id: 'produce', category: { id: 'produce', name: 'Produce' } }),
+    grocery('3', 'Bananas', { category_id: 'produce', category: { id: 'produce', name: 'Produce' } }),
+    grocery('4', 'Old bread', { status: 'purchased', completed_at: '2026-01-02T00:00:00Z', completed_by: 'user-1' }),
+    grocery('5', 'Soap'),
+  ]
+
+  it('detects active free-form duplicates case-insensitively', () => {
+    expect(findGroceryDuplicate(groceries, ' milk ')?.id).toBe('1')
+    expect(findGroceryDuplicate(groceries, 'Old bread')).toBeUndefined()
+  })
+
+  it('groups active entries by category, sorts names, and puts uncategorized last', () => {
+    const groups = groupActiveGroceries(groceries)
+    expect(groups.map((group) => group.name)).toEqual(['Dairy', 'Produce', 'Uncategorized'])
+    expect(groups[1].items.map((entry) => entry.name)).toEqual(['Apples', 'Bananas'])
   })
 })
 
@@ -132,4 +190,3 @@ describe('duplicate and join-code helpers', () => {
     expect(formatJoinCode('abcde fghij')).toBe('ABCDE-FGHIJ')
   })
 })
-

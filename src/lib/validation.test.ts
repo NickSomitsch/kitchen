@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { itemSchema } from './validation'
+import { groceryItemSchema, itemSchema, purchaseSchema } from './validation'
 
 const validItem = {
   name: 'Flour',
@@ -8,6 +8,8 @@ const validItem = {
   categoryId: '',
   locationId: '',
   notes: '',
+  lowStockEnabled: false,
+  lowStockThreshold: 0,
 }
 
 describe('item validation', () => {
@@ -28,3 +30,26 @@ describe('item validation', () => {
   })
 })
 
+describe('grocery validation', () => {
+  const grocery = {
+    inventoryItemId: '',
+    name: 'Olive oil',
+    quantity: '',
+    unit: 'l' as const,
+    categoryId: '',
+    notes: '',
+  }
+
+  it('allows an omitted amount and validates positive three-decimal quantities', () => {
+    expect(groceryItemSchema.safeParse(grocery).success).toBe(true)
+    expect(groceryItemSchema.safeParse({ ...grocery, quantity: '1.125' }).success).toBe(true)
+    expect(groceryItemSchema.safeParse({ ...grocery, quantity: '0' }).success).toBe(false)
+    expect(groceryItemSchema.safeParse({ ...grocery, quantity: '1.2345' }).success).toBe(false)
+  })
+
+  it('requires purchase details only when stocking inventory', () => {
+    expect(purchaseSchema.safeParse({ stockAction: 'none', quantity: '', unit: 'piece', targetInventoryItemId: '', locationId: '' }).success).toBe(true)
+    expect(purchaseSchema.safeParse({ stockAction: 'existing', quantity: '', unit: 'piece', targetInventoryItemId: '', locationId: '' }).success).toBe(false)
+    expect(purchaseSchema.safeParse({ stockAction: 'new', quantity: '2', unit: 'piece', targetInventoryItemId: '', locationId: '' }).success).toBe(true)
+  })
+})

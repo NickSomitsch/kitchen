@@ -5,6 +5,7 @@ import {
   MoreHorizontal,
   PackageOpen,
   Pencil,
+  ShoppingCart,
   Trash2,
 } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -13,9 +14,11 @@ import { Navigate } from 'react-router-dom'
 import {
   deleteInventoryItem,
   fetchCategories,
+  fetchGroceries,
   fetchInventory,
   fetchLocations,
   queryKeys,
+  createGroceryItem,
 } from '../api/kitchen'
 import { AppShell } from '../components/AppShell'
 import { InventoryFilters } from '../components/InventoryFilters'
@@ -23,7 +26,7 @@ import { ItemForm } from '../components/ItemForm'
 import { Button, ErrorNotice, LoadingScreen, Modal } from '../components/ui'
 import { useHousehold } from '../hooks/useHousehold'
 import { getErrorMessage } from '../lib/errors'
-import { filterAndSortInventory, formatQuantity } from '../lib/inventory'
+import { filterAndSortInventory, formatQuantity, isLowStock } from '../lib/inventory'
 import type {
   InventoryFilters as InventoryFiltersValue,
   InventoryItem,
@@ -71,11 +74,29 @@ export function InventoryPage() {
     queryFn: () => fetchLocations(householdId),
     enabled: Boolean(householdId),
   })
+  const groceries = useQuery({
+    queryKey: queryKeys.groceries(householdId),
+    queryFn: () => fetchGroceries(householdId),
+    enabled: Boolean(householdId),
+  })
   const deleteMutation = useMutation({
     mutationFn: (item: InventoryItem) => deleteInventoryItem(item),
     onSuccess: async () => {
       setDeletingItem(undefined)
       await queryClient.invalidateQueries({ queryKey: queryKeys.inventory(householdId) })
+    },
+  })
+  const groceryMutation = useMutation({
+    mutationFn: (item: InventoryItem) => createGroceryItem({
+      inventory_item_id: item.id,
+      name: item.name,
+      quantity: null,
+      unit: null,
+      category_id: item.category_id,
+      notes: null,
+    }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.groceries(householdId) })
     },
   })
 
@@ -88,13 +109,19 @@ export function InventoryPage() {
     filters.categoryIds.length + filters.locationIds.length + filters.units.length +
     (filters.stock === 'all' ? 0 : 1) + (filters.search.trim() ? 1 : 0)
   const outOfStock = items.filter((item) => item.quantity === 0).length
+  const lowStock = items.filter(isLowStock).length
+  const activeGroceryIds = new Set(
+    (groceries.data ?? [])
+      .filter((item) => item.status === 'active' && item.inventory_item_id)
+      .map((item) => item.inventory_item_id),
+  )
 
   if (household.isLoading) return <LoadingScreen />
   if (household.isError) return <ErrorNotice message={getErrorMessage(household.error)} onRetry={() => void household.refetch()} />
   if (!household.data) return <Navigate to="/onboarding" replace />
 
-  const queryError = inventory.error ?? categories.error ?? locations.error
-  const queriesLoading = inventory.isLoading || categories.isLoading || locations.isLoading
+  const queryError = inventory.error ?? categories.error ?? locations.error ?? groceries.error
+  const queriesLoading = inventory.isLoading || categories.isLoading || locations.isLoading || groceries.isLoading
 
   function openCreate() {
     setEditingItem(undefined)
@@ -113,7 +140,7 @@ export function InventoryPage() {
           <div>
             <p className="eyebrow">Kitchen overview</p>
             <h1>Inventory</h1>
-            <p>{items.length} {items.length === 1 ? 'item' : 'items'} on hand{outOfStock ? ` · ${outOfStock} out of stock` : ''}</p>
+            <p>{items.length} {items.length === 1 ? 'item' : 'items'} on hand{outOfStock ? ` · ${outOfStock} out of stock` : ''}{lowStock ? ` · ${lowStock} low stock` : ''}</p>
           </div>
           <Button onClick={openCreate}><CirclePlus size={18} /> Add item</Button>
         </header>
@@ -131,7 +158,7 @@ export function InventoryPage() {
 
         {queryError ? (
           <ErrorNotice message={getErrorMessage(queryError)} onRetry={() => {
-            void inventory.refetch(); void categories.refetch(); void locations.refetch()
+            void inventory.refetch(); void categories.refetch(); void locations.refetch(); void groceries.refetch()
           }} />
         ) : queriesLoading ? (
           <div className="inventory-skeleton" aria-label="Loading inventory"><span /><span /><span /></div>
@@ -159,11 +186,11 @@ export function InventoryPage() {
                   {visibleItems.map((item) => (
                     <tr key={item.id} className={item.quantity === 0 ? 'out-row' : ''}>
                       <td><button className="item-name-button" onClick={() => openEdit(item)}><span className="item-avatar">{item.name.slice(0, 1).toUpperCase()}</span><span><strong>{item.name}</strong>{item.notes ? <small>{item.notes}</small> : null}</span></button></td>
-                      <td><strong className="quantity-value">{formatQuantity(item.quantity, item.unit)}</strong>{item.quantity === 0 ? <span className="status-chip">Out of stock</span> : null}</td>
+                      <td><strong className="quantity-value">{formatQuantity(item.quantity, item.unit)}</strong>{item.quantity === 0 ? <span className="status-chip">Out of stock</span> : isLowStock(item) ? <span className="status-chip warning-chip">Low stock</span> : null}</td>
                       <td>{item.category ? <span className="soft-chip">{item.category.name}</span> : <span className="muted">—</span>}</td>
                       <td>{item.location ? <span className="location-value"><MapPin size={15} /> {item.location.name}</span> : <span className="muted">—</span>}</td>
                       <td><span className="updated-value">{relativeDate(item.updated_at)}</span></td>
-                      <td><div className="row-actions"><button onClick={() => openEdit(item)} aria-label={`Edit ${item.name}`}><Pencil size={17} /></button><button className="danger-icon" onClick={() => setDeletingItem(item)} aria-label={`Delete ${item.name}`}><Trash2 size={17} /></button></div></td>
+                      <td><div className="row-actions"><button disabled={activeGroceryIds.has(item.id)} onClick={() => groceryMutation.mutate(item)} aria-label={activeGroceryIds.has(item.id) ? `${item.name} is on grocery list` : `Add ${item.name} to groceries`} title={activeGroceryIds.has(item.id) ? 'On grocery list' : 'Add to groceries'}><ShoppingCart size={17} /></button><button onClick={() => openEdit(item)} aria-label={`Edit ${item.name}`}><Pencil size={17} /></button><button className="danger-icon" onClick={() => setDeletingItem(item)} aria-label={`Delete ${item.name}`}><Trash2 size={17} /></button></div></td>
                     </tr>
                   ))}
                 </tbody>
@@ -174,10 +201,10 @@ export function InventoryPage() {
                 <article className={`inventory-card ${item.quantity === 0 ? 'out-card' : ''}`} key={item.id}>
                   <button className="card-main" onClick={() => openEdit(item)}>
                     <span className="item-avatar">{item.name.slice(0, 1).toUpperCase()}</span>
-                    <span className="card-copy"><span className="card-title-line"><strong>{item.name}</strong>{item.quantity === 0 ? <span className="status-dot" title="Out of stock" /> : null}</span><span>{item.category?.name ?? 'Uncategorised'} · {item.location?.name ?? 'No location'}</span></span>
-                    <span className="card-quantity">{formatQuantity(item.quantity, item.unit)}{item.quantity === 0 ? <small>Out of stock</small> : null}</span>
+                    <span className="card-copy"><span className="card-title-line"><strong>{item.name}</strong>{isLowStock(item) ? <span className="status-dot" title="Low stock" /> : null}</span><span>{item.category?.name ?? 'Uncategorised'} · {item.location?.name ?? 'No location'}</span></span>
+                    <span className="card-quantity">{formatQuantity(item.quantity, item.unit)}{item.quantity === 0 ? <small>Out of stock</small> : isLowStock(item) ? <small>Low stock</small> : null}</span>
                   </button>
-                  <details className="card-actions"><summary aria-label={`Actions for ${item.name}`}><MoreHorizontal size={19} /></summary><div><button onClick={() => openEdit(item)}><Pencil size={16} /> Edit</button><button className="danger-text" onClick={() => setDeletingItem(item)}><Trash2 size={16} /> Delete</button></div></details>
+                  <details className="card-actions"><summary aria-label={`Actions for ${item.name}`}><MoreHorizontal size={19} /></summary><div><button disabled={activeGroceryIds.has(item.id)} onClick={() => groceryMutation.mutate(item)}><ShoppingCart size={16} /> {activeGroceryIds.has(item.id) ? 'On list' : 'Add to list'}</button><button onClick={() => openEdit(item)}><Pencil size={16} /> Edit</button><button className="danger-text" onClick={() => setDeletingItem(item)}><Trash2 size={16} /> Delete</button></div></details>
                 </article>
               ))}
             </div>
