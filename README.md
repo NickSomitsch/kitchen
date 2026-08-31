@@ -1,40 +1,63 @@
 # Kitchen Inventory
 
-A personal, mobile-first web app for knowing what is in the kitchen, planning the next grocery trip, and finding recipes that use what is already available.
+A mobile-first shared kitchen inventory. Household members can manage quantities, categories, and storage locations together, with live updates across devices.
 
-## Planned features
+## Features
 
+- Email/password authentication and shared households
 - Add, edit, remove, search, filter, and sort inventory items
-- Track quantities and units such as g, kg, ml, l, pieces, and packages
-- Store nutrition data, categories, locations, expiry dates, and low-stock levels
-- Build a grocery list manually or from low-stock items and recipes
-- Scan barcodes or photos to prefill product and nutrition details before confirmation
-- Recommend recipes by ingredient coverage, expiry priority, preferences, and available time
-- Install as a PWA and keep the grocery list usable on mobile
+- Grams, kilograms, millilitres, litres, pieces, and packages
+- Safe mass and volume conversion when changing units
+- Shared categories and storage locations
+- Out-of-stock tracking, duplicate warnings, and concurrent-edit protection
+- Responsive phone cards and desktop table
+- Supabase Row Level Security and Realtime synchronization
 
-## Proposed stack
+## Stack
 
-- React, TypeScript, and Vite for the frontend
-- Tailwind CSS for styling
-- Supabase for Postgres data, authentication, image storage, and secure server-side functions
-- Open Food Facts for barcode and nutrition lookups
-- GitHub Actions and GitHub Pages for frontend deployment
-- Vitest and Playwright for testing
+React, TypeScript, Vite, Tailwind CSS, TanStack Query, Supabase, Vitest, Playwright, GitHub Actions, and GitHub Pages.
 
-GitHub Pages serves only the static frontend. Secrets and image-analysis requests must run through a backend function and must never be embedded in browser code.
+## Local setup
 
-## Suggested delivery order
+Requirements: Node.js 22+, Docker, and the Supabase CLI.
 
-1. Inventory CRUD, search, sorting, filters, and unit handling
-2. Grocery list, low-stock rules, and quick inventory adjustments
-3. Authentication, cloud sync, export, and offline-friendly PWA support
-4. Barcode lookup, then photo or receipt recognition with a review step
-5. Recipe matching, expiry-aware suggestions, and meal planning
+```bash
+npm install
+npx supabase start
+cp .env.example .env.local
+```
 
-## Status
+Copy the local API URL and publishable/anon key shown by `npx supabase status` into `.env.local`, then run:
 
-Planning stage. The first milestone is a small inventory and grocery-list MVP.
+```bash
+npm run dev
+```
 
-## Development
+The site is served under `/kitchen/`. Confirmation messages from the local email service are available at `http://127.0.0.1:54324`.
 
-Setup and local-development commands will be added when the application is scaffolded.
+## Verification
+
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run test:db
+RUN_E2E=1 npm run test:e2e
+npm run build
+```
+
+Database and browser tests require the local Supabase stack to be running. The browser test creates temporary users and households in the local database.
+Maintainers can also run `npm run test:hosted` with the three server-side Supabase environment variables documented by the script; it removes all synthetic data in a `finally` block.
+
+## Deployment
+
+1. Create a hosted Supabase project and run `npx supabase db push`.
+2. Enable email confirmation and add `https://nicksomitsch.github.io/kitchen/` to the Auth redirect URLs.
+3. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` as GitHub Actions repository variables.
+4. Set GitHub Pages to use **GitHub Actions** as its source.
+
+Pushing `main` verifies the app and deploys `dist/` to GitHub Pages. The publishable key is designed for browser use; access is enforced by database policies. Never add a Supabase secret or service-role key to this repository.
+
+## Next milestones
+
+Grocery lists and low-stock rules; offline/PWA support; barcode and photo recognition; nutrition data; recipe matching and meal planning.
