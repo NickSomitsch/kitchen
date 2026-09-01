@@ -60,12 +60,12 @@ export function PurchaseForm({
       }
       return completeGroceryItem(item, input)
     },
-    onSuccess: async () => {
-      await Promise.all([
+    onSuccess: () => {
+      onClose()
+      void Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.groceries(householdId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.inventory(householdId) }),
       ])
-      onClose()
     },
   })
 

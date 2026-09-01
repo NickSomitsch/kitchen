@@ -84,9 +84,9 @@ export function ItemForm({
       if (item) return updateInventoryItem(item, input)
       return createInventoryItem(householdId, user!.id, input)
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.inventory(householdId) })
+    onSuccess: () => {
       onClose()
+      void queryClient.invalidateQueries({ queryKey: queryKeys.inventory(householdId) })
     },
   })
 

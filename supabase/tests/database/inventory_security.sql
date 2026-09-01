@@ -1,5 +1,5 @@
 begin;
-select plan(38);
+select plan(51);
 
 insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data)
 values
@@ -247,6 +247,106 @@ select throws_ok(
   '42501',
   'permission denied for table grocery_items',
   'direct grocery writes are denied in favor of protected functions'
+);
+
+set local request.jwt.claim.sub = '00000000-0000-4000-8000-000000000001';
+select lives_ok(
+  $$select public.apply_kitchen_command(
+      '10000000-0000-4000-8000-000000000001', 'inventory.create',
+      '{"id":"10000000-0000-4000-8000-000000000011","name":"Offline oats","quantity":1,"unit":"kg","category_id":null,"location_id":null,"notes":null,"low_stock_threshold":null}'::jsonb
+    )$$,
+  'an offline inventory command creates a client-selected id'
+);
+select lives_ok(
+  $$select public.apply_kitchen_command(
+      '10000000-0000-4000-8000-000000000001', 'inventory.create',
+      '{"id":"10000000-0000-4000-8000-000000000011","name":"Offline oats","quantity":1,"unit":"kg","category_id":null,"location_id":null,"notes":null,"low_stock_threshold":null}'::jsonb
+    )$$,
+  'retrying an acknowledged inventory command returns its receipt'
+);
+select is(
+  (select count(*)::integer from public.inventory_items where id = '10000000-0000-4000-8000-000000000011'),
+  1,
+  'an idempotent retry does not duplicate inventory'
+);
+reset role;
+select is(
+  (select count(*)::integer from public.mutation_receipts where operation_id = '10000000-0000-4000-8000-000000000001'),
+  1,
+  'exactly one private mutation receipt is stored'
+);
+set local role authenticated;
+set local request.jwt.claim.sub = '00000000-0000-4000-8000-000000000002';
+select lives_ok(
+  $$select public.apply_kitchen_command(
+      '10000000-0000-4000-8000-000000000005', 'inventory.update',
+      '{"id":"10000000-0000-4000-8000-000000000011","expected_version":1,"name":"Offline oats","quantity":2,"unit":"kg","category_id":null,"location_id":null,"notes":null,"low_stock_threshold":null}'::jsonb
+    )$$,
+  'an equal household member can synchronize an inventory command'
+);
+set local request.jwt.claim.sub = '00000000-0000-4000-8000-000000000001';
+select throws_ok(
+  $$select public.apply_kitchen_command(
+      '10000000-0000-4000-8000-000000000006', 'inventory.update',
+      '{"id":"10000000-0000-4000-8000-000000000011","expected_version":1,"name":"Stale oats","quantity":3,"unit":"kg","category_id":null,"location_id":null,"notes":null,"low_stock_threshold":null}'::jsonb
+    )$$,
+  '40001',
+  'This inventory item has changed.',
+  'stale offline edits preserve optimistic concurrency'
+);
+select throws_ok(
+  $$select public.apply_kitchen_command_v2(
+      '10000000-0000-4000-8000-000000000007', 'inventory.update',
+      '{"id":"10000000-0000-4000-8000-000000000011","expected_version":1,"name":"HTTP stale oats","quantity":3,"unit":"kg","category_id":null,"location_id":null,"notes":null,"low_stock_threshold":null}'::jsonb
+    )$$,
+  'PT409',
+  'This inventory item has changed.',
+  'the HTTP command wrapper exposes deterministic conflicts without retry semantics'
+);
+select throws_ok(
+  $$select public.apply_kitchen_command(
+      '10000000-0000-4000-8000-000000000001', 'inventory.delete',
+      '{"id":"10000000-0000-4000-8000-000000000011","expected_version":1}'::jsonb
+    )$$,
+  '22023',
+  'That operation id was already used for a different command.',
+  'an operation id cannot be reused with another request'
+);
+select lives_ok(
+  $$select public.apply_kitchen_command(
+      '10000000-0000-4000-8000-000000000002', 'grocery.create',
+      '{"id":"10000000-0000-4000-8000-000000000012","inventory_item_id":null,"name":"Offline soap","quantity":null,"unit":null,"category_id":null,"notes":null}'::jsonb
+    )$$,
+  'an offline grocery command creates a client-selected id'
+);
+select lives_ok(
+  $$select public.apply_kitchen_command(
+      '10000000-0000-4000-8000-000000000003', 'grocery.complete',
+      '{"id":"10000000-0000-4000-8000-000000000012","expected_version":1,"stock_action":"new","quantity":2,"unit":"package","target_inventory_item_id":null,"linked_inventory_item_id":null,"new_inventory_item_id":"10000000-0000-4000-8000-000000000013","new_location_id":null,"name":"Offline soap","category_id":null,"notes":null}'::jsonb
+    )$$,
+  'offline purchase completion atomically creates inventory'
+);
+select lives_ok(
+  $$select public.apply_kitchen_command(
+      '10000000-0000-4000-8000-000000000003', 'grocery.complete',
+      '{"id":"10000000-0000-4000-8000-000000000012","expected_version":1,"stock_action":"new","quantity":2,"unit":"package","target_inventory_item_id":null,"linked_inventory_item_id":null,"new_inventory_item_id":"10000000-0000-4000-8000-000000000013","new_location_id":null,"name":"Offline soap","category_id":null,"notes":null}'::jsonb
+    )$$,
+  'retrying purchase completion does not stock twice'
+);
+select is(
+  (select count(*)::integer from public.inventory_items where id = '10000000-0000-4000-8000-000000000013' and quantity = 2),
+  1,
+  'the retried purchase creates exactly one inventory row'
+);
+set local request.jwt.claim.sub = '00000000-0000-4000-8000-000000000003';
+select throws_ok(
+  $$select public.apply_kitchen_command(
+      '10000000-0000-4000-8000-000000000004', 'inventory.update',
+      '{"id":"10000000-0000-4000-8000-000000000011","expected_version":1,"name":"Forbidden","quantity":1,"unit":"kg","category_id":null,"location_id":null,"notes":null,"low_stock_threshold":null}'::jsonb
+    )$$,
+  'P0002',
+  'That inventory item is no longer available.',
+  'offline commands reject cross-household entity ids'
 );
 
 set local request.jwt.claim.sub = '00000000-0000-4000-8000-000000000001';

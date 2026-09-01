@@ -79,6 +79,20 @@ export interface Database {
         Update: never
         Relationships: []
       }
+      mutation_receipts: {
+        Row: {
+          household_id: string
+          user_id: string
+          operation_id: string
+          command_type: string
+          request: Json
+          result: Json
+          completed_at: string
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -152,6 +166,14 @@ export interface Database {
         Returns: { grocery_item_id: string; created: boolean }[]
       }
       clear_grocery_history: { Args: Record<string, never>; Returns: number }
+      apply_kitchen_command: {
+        Args: { operation_id: string; command_type: string; request: Json }
+        Returns: Json
+      }
+      apply_kitchen_command_v2: {
+        Args: { operation_id: string; command_type: string; request: Json }
+        Returns: Json
+      }
       shares_household: { Args: { other_user_id: string }; Returns: boolean }
     }
     Enums: {
@@ -224,6 +246,7 @@ export interface InventoryItemRow {
 export interface InventoryItem extends InventoryItemRow {
   category: Pick<Category, 'id' | 'name'> | null
   location: Pick<StorageLocation, 'id' | 'name'> | null
+  local_sync_status?: LocalSyncStatus
 }
 
 export type GroceryItemSource = 'manual' | 'low_stock'
@@ -253,6 +276,7 @@ export interface GroceryItemRow {
 export interface GroceryItem extends GroceryItemRow {
   category: Pick<Category, 'id' | 'name'> | null
   inventory_item: Pick<InventoryItemRow, 'id' | 'name' | 'quantity' | 'unit' | 'low_stock_threshold'> | null
+  local_sync_status?: LocalSyncStatus
 }
 
 export interface GroceryItemInput {
@@ -302,4 +326,44 @@ export interface ItemInput {
   location_id: string | null
   notes: string | null
   low_stock_threshold: number | null
+}
+
+export type OfflineOperationKind =
+  | 'inventory.create'
+  | 'inventory.update'
+  | 'inventory.delete'
+  | 'grocery.create'
+  | 'grocery.update'
+  | 'grocery.delete'
+  | 'grocery.complete'
+  | 'grocery.repeat'
+
+export type OfflineOperationStatus = 'pending' | 'syncing' | 'conflict' | 'failed'
+export type LocalSyncStatus = 'pending' | 'conflict' | 'failed'
+export type ConnectionState = 'online' | 'offline' | 'syncing' | 'needs-attention'
+
+export interface OfflineOperation {
+  id: string
+  user_id: string
+  household_id: string
+  kind: OfflineOperationKind
+  entity_type: 'inventory' | 'grocery'
+  entity_id: string
+  payload: Record<string, Json>
+  status: OfflineOperationStatus
+  created_at: string
+  attempts: number
+  error_code: string | null
+  error_message: string | null
+  latest: Record<string, Json> | null
+}
+
+export interface SyncConflict {
+  operation: OfflineOperation
+  latest: Record<string, Json> | null
+}
+
+export interface LocalRecordMeta {
+  sync_status: LocalSyncStatus
+  operation_id: string
 }

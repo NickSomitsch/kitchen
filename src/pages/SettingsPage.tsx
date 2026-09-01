@@ -31,6 +31,7 @@ import { TaxonomyManager } from '../components/TaxonomyManager'
 import { Button, ErrorNotice, LoadingScreen, Modal } from '../components/ui'
 import { useHousehold } from '../hooks/useHousehold'
 import { getErrorMessage } from '../lib/errors'
+import { useOffline } from '../offline/OfflineContext'
 import { formatJoinCode } from '../lib/inventory'
 import type { HouseholdMember } from '../types/database'
 
@@ -39,6 +40,7 @@ export function SettingsPage() {
   const household = useHousehold()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const offline = useOffline().connectionState === 'offline'
   const householdId = household.data?.household.id ?? ''
   const [householdNameDraft, setHouseholdNameDraft] = useState<string | null>(null)
   const [displayNameDraft, setDisplayNameDraft] = useState<string | null>(null)
@@ -100,15 +102,16 @@ export function SettingsPage() {
         <header className="page-heading"><div><p className="eyebrow">Shared kitchen</p><h1>Settings</h1><p>Manage your household, labels, and the people you share with.</p></div></header>
         {queryError ? <ErrorNotice message={getErrorMessage(queryError)} /> : loading ? <div className="inventory-skeleton"><span /><span /><span /></div> : (
           <div className="settings-stack">
+            {offline ? <div className="notice notice-warning">Settings are read-only while offline. Inventory and grocery changes can still be queued.</div> : null}
             <section className="settings-card">
               <div className="settings-card-heading"><div><span className="settings-icon"><Pencil size={19} /></span><div><h2>Names</h2><p>How you and your household appear across Kitchen.</p></div></div></div>
               <div className="settings-form-grid">
                 <form onSubmit={(event) => { event.preventDefault(); if (displayName.trim()) displayNameMutation.mutate() }}>
-                  <label className="field"><span>Your display name</span><div className="inline-field"><input value={displayName} maxLength={80} onChange={(event) => setDisplayNameDraft(event.target.value)} /><Button type="submit" variant="secondary" busy={displayNameMutation.isPending} disabled={!displayName.trim() || displayName.trim() === context.profile.display_name}>Save</Button></div></label>
+                  <label className="field"><span>Your display name</span><div className="inline-field"><input value={displayName} maxLength={80} onChange={(event) => setDisplayNameDraft(event.target.value)} /><Button type="submit" variant="secondary" busy={displayNameMutation.isPending} disabled={offline || !displayName.trim() || displayName.trim() === context.profile.display_name}>Save</Button></div></label>
                   {displayNameMutation.isError ? <span className="field-error">{getErrorMessage(displayNameMutation.error)}</span> : null}
                 </form>
                 <form onSubmit={(event) => { event.preventDefault(); if (householdName.trim()) householdNameMutation.mutate() }}>
-                  <label className="field"><span>Household name</span><div className="inline-field"><input value={householdName} maxLength={80} onChange={(event) => setHouseholdNameDraft(event.target.value)} /><Button type="submit" variant="secondary" busy={householdNameMutation.isPending} disabled={!householdName.trim() || householdName.trim() === context.household.name}>Save</Button></div></label>
+                  <label className="field"><span>Household name</span><div className="inline-field"><input value={householdName} maxLength={80} onChange={(event) => setHouseholdNameDraft(event.target.value)} /><Button type="submit" variant="secondary" busy={householdNameMutation.isPending} disabled={offline || !householdName.trim() || householdName.trim() === context.household.name}>Save</Button></div></label>
                   {householdNameMutation.isError ? <span className="field-error">{getErrorMessage(householdNameMutation.error)}</span> : null}
                 </form>
               </div>
@@ -116,27 +119,27 @@ export function SettingsPage() {
 
             <section className="settings-card join-card">
               <div className="settings-card-heading"><div><span className="settings-icon"><KeyRound size={19} /></span><div><h2>Household join code</h2><p>Anyone with this code can join after creating an account.</p></div></div></div>
-              <div className="join-code-row"><code>{formatJoinCode(context.household.join_code)}</code><Button variant="secondary" onClick={() => void copyCode()}>{copied ? <Check size={17} /> : <Clipboard size={17} />}{copied ? 'Copied' : 'Copy code'}</Button><Button variant="ghost" busy={rotateMutation.isPending} onClick={() => rotateMutation.mutate()}><RefreshCw size={16} /> Rotate</Button></div>
+              <div className="join-code-row"><code>{formatJoinCode(context.household.join_code)}</code><Button variant="secondary" onClick={() => void copyCode()}>{copied ? <Check size={17} /> : <Clipboard size={17} />}{copied ? 'Copied' : 'Copy code'}</Button><Button variant="ghost" busy={rotateMutation.isPending} disabled={offline} onClick={() => rotateMutation.mutate()}><RefreshCw size={16} /> Rotate</Button></div>
               <p className="settings-hint">Rotating immediately invalidates the previous code.</p>
               {rotateMutation.isError ? <ErrorNotice message={getErrorMessage(rotateMutation.error)} /> : null}
             </section>
 
-            <TaxonomyManager type="categories" householdId={householdId} values={categories.data ?? []} inventory={inventory.data ?? []} />
-            <TaxonomyManager type="locations" householdId={householdId} values={locations.data ?? []} inventory={inventory.data ?? []} />
+            <TaxonomyManager type="categories" householdId={householdId} values={categories.data ?? []} inventory={inventory.data ?? []} offline={offline} />
+            <TaxonomyManager type="locations" householdId={householdId} values={locations.data ?? []} inventory={inventory.data ?? []} offline={offline} />
 
             <section className="settings-card">
               <div className="settings-card-heading"><div><span className="settings-icon"><Users size={19} /></span><div><h2>Household members</h2><p>Every member has equal access to inventory and settings.</p></div></div><span className="count-badge">{members.data?.length ?? 0}</span></div>
               <div className="member-list">
                 {members.data?.map((member) => (
-                  <div className="member-row" key={member.user_id}><span className="avatar">{(member.profile?.display_name ?? '?').slice(0, 1).toUpperCase()}</span><div><strong>{member.profile?.display_name ?? 'Household member'}{member.user_id === user?.id ? ' (you)' : ''}</strong><span>Joined {new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(new Date(member.joined_at))}</span></div>{member.user_id !== user?.id ? <Button variant="ghost" onClick={() => setRemoving(member)}><UserMinus size={16} /> Remove</Button> : null}</div>
+                  <div className="member-row" key={member.user_id}><span className="avatar">{(member.profile?.display_name ?? '?').slice(0, 1).toUpperCase()}</span><div><strong>{member.profile?.display_name ?? 'Household member'}{member.user_id === user?.id ? ' (you)' : ''}</strong><span>Joined {new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(new Date(member.joined_at))}</span></div>{member.user_id !== user?.id ? <Button variant="ghost" disabled={offline} onClick={() => setRemoving(member)}><UserMinus size={16} /> Remove</Button> : null}</div>
                 ))}
               </div>
-              <div className="member-footer"><Button variant="secondary" onClick={() => setLeaveOpen(true)}><LogOut size={16} /> Leave household</Button></div>
+              <div className="member-footer"><Button variant="secondary" disabled={offline} onClick={() => setLeaveOpen(true)}><LogOut size={16} /> Leave household</Button></div>
             </section>
 
             <section className="settings-card danger-zone">
               <div><h2>Delete household</h2><p>Permanently remove the household, inventory, categories, locations, and memberships.</p></div>
-              <Button variant="danger" onClick={() => setDeleteOpen(true)}><Trash2 size={17} /> Delete household</Button>
+              <Button variant="danger" disabled={offline} onClick={() => setDeleteOpen(true)}><Trash2 size={17} /> Delete household</Button>
             </section>
           </div>
         )}

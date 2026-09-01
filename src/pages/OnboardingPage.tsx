@@ -3,12 +3,14 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { createHousehold, joinHousehold, queryKeys } from '../api/kitchen'
+import { useAuth } from '../auth/AuthContext'
 import { Button, ErrorNotice, LoadingScreen } from '../components/ui'
 import { useHousehold } from '../hooks/useHousehold'
 import { getErrorMessage } from '../lib/errors'
 import { supabase } from '../lib/supabase'
 
 export function OnboardingPage() {
+  const { forgetCachedUser } = useAuth()
   const household = useHousehold()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -42,7 +44,7 @@ export function OnboardingPage() {
     <main className="onboarding-page">
       <header className="onboarding-header">
         <div className="auth-brand dark"><div className="brand-mark"><span>K</span></div> Kitchen</div>
-        <button onClick={() => void supabase.auth.signOut()} className="text-button"><LogOut size={17} /> Sign out</button>
+        <button onClick={() => void supabase.auth.signOut().finally(forgetCachedUser)} className="text-button"><LogOut size={17} /> Sign out</button>
       </header>
       <section className="onboarding-card">
         <div className="onboarding-intro">

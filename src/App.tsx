@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './auth/AuthContext'
 import { LoadingScreen } from './components/ui'
 import { useHousehold } from './hooks/useHousehold'
 import { isSupabaseConfigured } from './lib/supabase'
+import { OfflineProvider } from './offline/OfflineContext'
 
 const AuthPage = lazy(() => import('./pages/AuthPage').then((module) => ({ default: module.AuthPage })))
 const InventoryPage = lazy(() => import('./pages/InventoryPage').then((module) => ({ default: module.InventoryPage })))
@@ -14,8 +15,8 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage').then((module) => 
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 20_000, retry: 1, refetchOnWindowFocus: false },
-    mutations: { retry: 0 },
+    queries: { staleTime: 20_000, retry: 1, refetchOnWindowFocus: false, networkMode: 'always' },
+    mutations: { retry: 0, networkMode: 'always' },
   },
 })
 
@@ -54,9 +55,10 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <HashRouter>
-          <Suspense fallback={<LoadingScreen />}>
-            <Routes>
+        <OfflineProvider>
+          <HashRouter>
+            <Suspense fallback={<LoadingScreen />}>
+              <Routes>
               <Route path="/" element={<HomeRoute />} />
               <Route path="/auth" element={<AuthPage />} />
               <Route
@@ -76,9 +78,10 @@ export function App() {
                 element={<ProtectedRoute><SettingsPage /></ProtectedRoute>}
               />
               <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Suspense>
-        </HashRouter>
+              </Routes>
+            </Suspense>
+          </HashRouter>
+        </OfflineProvider>
       </AuthProvider>
     </QueryClientProvider>
   )

@@ -78,10 +78,10 @@ export function GroceryItemForm({
       if (item) return updateGroceryItem(item, input)
       return createGroceryItem(input)
     },
-    onSuccess: async (result) => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.groceries(householdId) })
+    onSuccess: (result) => {
       if (result && 'created' in result && !result.created) onExisting(result.grocery_item_id)
       else onClose()
+      void queryClient.invalidateQueries({ queryKey: queryKeys.groceries(householdId) })
     },
   })
 

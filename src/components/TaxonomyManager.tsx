@@ -18,11 +18,13 @@ export function TaxonomyManager({
   householdId,
   values,
   inventory,
+  offline = false,
 }: {
   type: 'categories' | 'locations'
   householdId: string
   values: Taxonomy[]
   inventory: InventoryItem[]
+  offline?: boolean
 }) {
   const queryClient = useQueryClient()
   const [editing, setEditing] = useState<Taxonomy | undefined>()
@@ -84,7 +86,7 @@ export function TaxonomyManager({
     <section className="settings-card taxonomy-card">
       <div className="settings-card-heading">
         <div><span className="settings-icon"><Tag size={19} /></span><div><h2>{type === 'categories' ? 'Categories' : 'Storage locations'}</h2><p>{type === 'categories' ? 'Group similar foods for faster filtering.' : 'Keep track of where every item is stored.'}</p></div></div>
-        <Button variant="secondary" onClick={openCreate}><CirclePlus size={17} /> Add {singular}</Button>
+        <Button variant="secondary" disabled={offline} onClick={openCreate}><CirclePlus size={17} /> Add {singular}</Button>
       </div>
       <div className="taxonomy-list">
         {values.map((value) => {
@@ -93,8 +95,8 @@ export function TaxonomyManager({
             <div className="taxonomy-row" key={value.id}>
               <span className="taxonomy-dot" aria-hidden="true" />
               <div><strong>{value.name}</strong><span>{count} {count === 1 ? 'item' : 'items'}</span></div>
-              <IconButton label={`Rename ${value.name}`} onClick={() => openEdit(value)}><Pencil size={16} /></IconButton>
-              <IconButton label={`Delete ${value.name}`} className="danger-icon" onClick={() => setDeleting(value)}><Trash2 size={16} /></IconButton>
+              <IconButton label={`Rename ${value.name}`} disabled={offline} onClick={() => openEdit(value)}><Pencil size={16} /></IconButton>
+              <IconButton label={`Delete ${value.name}`} disabled={offline} className="danger-icon" onClick={() => setDeleting(value)}><Trash2 size={16} /></IconButton>
             </div>
           )
         })}
@@ -115,4 +117,3 @@ export function TaxonomyManager({
     </section>
   )
 }
-

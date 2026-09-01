@@ -29,6 +29,7 @@ import { PurchaseForm } from '../components/PurchaseForm'
 import { Button, ErrorNotice, LoadingScreen, Modal } from '../components/ui'
 import { useHousehold } from '../hooks/useHousehold'
 import { getErrorMessage } from '../lib/errors'
+import { useOffline } from '../offline/OfflineContext'
 import { findGroceryDuplicate, formatQuantity, groupActiveGroceries, isLowStock } from '../lib/inventory'
 import type { GroceryItem } from '../types/database'
 
@@ -41,6 +42,7 @@ function relativeDate(value: string) {
 export function GroceryPage() {
   const household = useHousehold()
   const queryClient = useQueryClient()
+  const offline = useOffline().connectionState === 'offline'
   const householdId = household.data?.household.id ?? ''
   const [quickName, setQuickName] = useState('')
   const [formOpen, setFormOpen] = useState(false)
@@ -95,9 +97,9 @@ export function GroceryPage() {
       category_id: null,
       notes: null,
     }),
-    onSuccess: async () => {
+    onSuccess: () => {
       setQuickName('')
-      await refresh()
+      void refresh()
     },
   })
   const deleteMutation = useMutation({
@@ -118,14 +120,14 @@ export function GroceryPage() {
       }
       await deleteGroceryItem(item)
     },
-    onSuccess: async () => {
+    onSuccess: () => {
       setDeletingItem(undefined)
-      await refresh()
+      void refresh()
     },
   })
   const repeatMutation = useMutation({
     mutationFn: repeatGroceryItem,
-    onSuccess: refresh,
+    onSuccess: () => { void refresh() },
   })
   const clearMutation = useMutation({
     mutationFn: clearGroceryHistory,
@@ -204,7 +206,7 @@ export function GroceryPage() {
                     <article className="grocery-row" key={item.id}>
                       <button className="purchase-check" onClick={() => setPurchasingItem(item)} aria-label={`Mark ${item.name} purchased`}><Check size={19} /></button>
                       <button className="grocery-main" onClick={() => { setEditingItem(item); setFormOpen(true) }}>
-                        <span className="grocery-title"><strong>{item.name}</strong>{item.source === 'low_stock' ? <span className="auto-chip"><Sparkles size={12} /> Automatic</span> : null}</span>
+                        <span className="grocery-title"><strong>{item.name}</strong>{item.source === 'low_stock' ? <span className="auto-chip"><Sparkles size={12} /> Automatic</span> : null}{item.local_sync_status ? <span className={`sync-chip sync-chip-${item.local_sync_status}`}>Pending sync</span> : null}</span>
                         <span>{item.quantity && item.unit ? formatQuantity(item.quantity, item.unit) : 'Amount not set'}{item.notes ? ` · ${item.notes}` : ''}</span>
                       </button>
                       <div className="grocery-actions">
@@ -222,7 +224,7 @@ export function GroceryPage() {
         {completedItems.length ? (
           <details className="grocery-history">
             <summary><span><Clock3 size={18} /> Recently purchased</span><b>{completedItems.length}</b></summary>
-            <div className="history-toolbar"><p>Completed items stay here until your household clears them.</p><Button variant="ghost" onClick={() => setClearHistoryOpen(true)}><Trash2 size={15} /> Clear history</Button></div>
+            <div className="history-toolbar"><p>Completed items stay here until your household clears them.</p><Button variant="ghost" disabled={offline} title={offline ? 'History can only be cleared while online' : undefined} onClick={() => setClearHistoryOpen(true)}><Trash2 size={15} /> Clear history</Button></div>
             <div className="history-list">
               {completedItems.map((item) => (
                 <article key={item.id}>

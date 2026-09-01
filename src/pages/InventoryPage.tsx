@@ -81,9 +81,9 @@ export function InventoryPage() {
   })
   const deleteMutation = useMutation({
     mutationFn: (item: InventoryItem) => deleteInventoryItem(item),
-    onSuccess: async () => {
+    onSuccess: () => {
       setDeletingItem(undefined)
-      await queryClient.invalidateQueries({ queryKey: queryKeys.inventory(householdId) })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.inventory(householdId) })
     },
   })
   const groceryMutation = useMutation({
@@ -95,8 +95,8 @@ export function InventoryPage() {
       category_id: item.category_id,
       notes: null,
     }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.groceries(householdId) })
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.groceries(householdId) })
     },
   })
 
@@ -185,7 +185,7 @@ export function InventoryPage() {
                 <tbody>
                   {visibleItems.map((item) => (
                     <tr key={item.id} className={item.quantity === 0 ? 'out-row' : ''}>
-                      <td><button className="item-name-button" onClick={() => openEdit(item)}><span className="item-avatar">{item.name.slice(0, 1).toUpperCase()}</span><span><strong>{item.name}</strong>{item.notes ? <small>{item.notes}</small> : null}</span></button></td>
+                      <td><button className="item-name-button" onClick={() => openEdit(item)}><span className="item-avatar">{item.name.slice(0, 1).toUpperCase()}</span><span><strong>{item.name}</strong>{item.local_sync_status ? <small className={`sync-chip sync-chip-${item.local_sync_status}`}>{item.local_sync_status === 'pending' ? 'Pending sync' : item.local_sync_status}</small> : item.notes ? <small>{item.notes}</small> : null}</span></button></td>
                       <td><strong className="quantity-value">{formatQuantity(item.quantity, item.unit)}</strong>{item.quantity === 0 ? <span className="status-chip">Out of stock</span> : isLowStock(item) ? <span className="status-chip warning-chip">Low stock</span> : null}</td>
                       <td>{item.category ? <span className="soft-chip">{item.category.name}</span> : <span className="muted">—</span>}</td>
                       <td>{item.location ? <span className="location-value"><MapPin size={15} /> {item.location.name}</span> : <span className="muted">—</span>}</td>
@@ -201,7 +201,7 @@ export function InventoryPage() {
                 <article className={`inventory-card ${item.quantity === 0 ? 'out-card' : ''}`} key={item.id}>
                   <button className="card-main" onClick={() => openEdit(item)}>
                     <span className="item-avatar">{item.name.slice(0, 1).toUpperCase()}</span>
-                    <span className="card-copy"><span className="card-title-line"><strong>{item.name}</strong>{isLowStock(item) ? <span className="status-dot" title="Low stock" /> : null}</span><span>{item.category?.name ?? 'Uncategorised'} · {item.location?.name ?? 'No location'}</span></span>
+                    <span className="card-copy"><span className="card-title-line"><strong>{item.name}</strong>{isLowStock(item) ? <span className="status-dot" title="Low stock" /> : null}</span><span>{item.local_sync_status ? 'Pending sync · ' : ''}{item.category?.name ?? 'Uncategorised'} · {item.location?.name ?? 'No location'}</span></span>
                     <span className="card-quantity">{formatQuantity(item.quantity, item.unit)}{item.quantity === 0 ? <small>Out of stock</small> : isLowStock(item) ? <small>Low stock</small> : null}</span>
                   </button>
                   <details className="card-actions"><summary aria-label={`Actions for ${item.name}`}><MoreHorizontal size={19} /></summary><div><button disabled={activeGroceryIds.has(item.id)} onClick={() => groceryMutation.mutate(item)}><ShoppingCart size={16} /> {activeGroceryIds.has(item.id) ? 'On list' : 'Add to list'}</button><button onClick={() => openEdit(item)}><Pencil size={16} /> Edit</button><button className="danger-text" onClick={() => setDeletingItem(item)}><Trash2 size={16} /> Delete</button></div></details>
