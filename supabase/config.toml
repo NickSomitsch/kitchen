@@ -31,3 +31,8 @@ otp_length = 8
 [auth.mfa.totp]
 enroll_enabled = true
 verify_enabled = true
+
+[functions.scan-image]
+# Recognition runs as the signed-in caller so the daily allowance and household
+# membership are both enforced by row level security.
+verify_jwt = true

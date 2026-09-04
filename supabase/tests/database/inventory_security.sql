@@ -1,5 +1,5 @@
 begin;
-select plan(51);
+select plan(76);
 
 insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data)
 values
@@ -347,6 +347,167 @@ select throws_ok(
   'P0002',
   'That inventory item is no longer available.',
   'offline commands reject cross-household entity ids'
+);
+
+set local request.jwt.claim.sub = '00000000-0000-4000-8000-000000000001';
+
+-- Product details, recipes, the meal plan, and scan credits
+select lives_ok(
+  $$select public.apply_kitchen_command(
+      '10000000-0000-4000-8000-000000000021', 'inventory.create',
+      '{"id":"20000000-0000-4000-8000-000000000001","name":"Recipe pasta","quantity":500,"unit":"g","category_id":null,"location_id":null,"notes":null,"low_stock_threshold":null,"barcode":"3017624010701","brand":"Barilla","expires_on":"2026-12-01","nutrition":{"basis":"g","per":100,"energy_kcal":350}}'::jsonb
+    )$$,
+  'an offline inventory command can carry a barcode, brand, nutrition, and a date'
+);
+select is(
+  (select barcode || '|' || brand || '|' || expires_on::text
+     from public.inventory_items where id = '20000000-0000-4000-8000-000000000001'),
+  '3017624010701|Barilla|2026-12-01',
+  'product details are stored alongside the item'
+);
+select lives_ok(
+  $$select public.apply_kitchen_command(
+      '10000000-0000-4000-8000-000000000022', 'inventory.update',
+      '{"id":"20000000-0000-4000-8000-000000000001","expected_version":1,"name":"Recipe pasta","quantity":600,"unit":"g","category_id":null,"location_id":null,"notes":null,"low_stock_threshold":null}'::jsonb
+    )$$,
+  'a client that predates these fields can still update an item'
+);
+select is(
+  (select barcode || '|' || expires_on::text
+     from public.inventory_items where id = '20000000-0000-4000-8000-000000000001'),
+  '3017624010701|2026-12-01',
+  'fields a request omits are preserved rather than cleared'
+);
+
+select lives_ok(
+  $$select public.save_recipe(
+      '30000000-0000-4000-8000-000000000001', null,
+      '{"name":"Test pasta","servings":2,"prep_minutes":5,"cook_minutes":10,"tags":["Quick"," quick ","One pot"]}'::jsonb,
+      '[{"name":"Recipe pasta","quantity":200,"unit":"g","optional":false},
+        {"name":"Tinned tomatoes","quantity":400,"unit":"g","optional":false},
+        {"name":"Basil","quantity":null,"unit":null,"optional":true}]'::jsonb
+    )$$,
+  'a member can save a recipe together with its ingredients'
+);
+select is(
+  (select cardinality(tags) from public.recipes where id = '30000000-0000-4000-8000-000000000001'),
+  2,
+  'recipe tags are trimmed, lower-cased, and de-duplicated'
+);
+select is(
+  (select count(*)::integer from public.recipe_ingredients
+     where recipe_id = '30000000-0000-4000-8000-000000000001'),
+  3,
+  'every ingredient row is stored against the recipe'
+);
+select throws_ok(
+  $$select public.save_recipe(
+      '30000000-0000-4000-8000-000000000001', 99,
+      '{"name":"Stale","servings":2}'::jsonb,
+      '[{"name":"Anything"}]'::jsonb
+    )$$,
+  '40001',
+  'This recipe has changed.',
+  'recipes use the same optimistic concurrency as inventory'
+);
+select throws_ok(
+  $$select public.save_recipe(
+      '30000000-0000-4000-8000-000000000002', null,
+      '{"name":"Empty","servings":2}'::jsonb, '[]'::jsonb
+    )$$,
+  '22023',
+  'Add at least one ingredient.',
+  'a recipe cannot be saved without ingredients'
+);
+
+select is(
+  (select added || '/' || skipped
+     from public.add_recipe_to_groceries('30000000-0000-4000-8000-000000000001', null)),
+  '2/1',
+  'only ingredients the kitchen is short of reach the grocery list'
+);
+select is(
+  (select deducted || '/' || unmatched
+     from public.log_recipe_cooked('30000000-0000-4000-8000-000000000001', 2, true)),
+  '1/2',
+  'cooking deducts only ingredients it can both match and measure'
+);
+select is(
+  (select quantity::text from public.inventory_items
+     where id = '20000000-0000-4000-8000-000000000001'),
+  '400.000',
+  'the cooked amount is taken out of inventory'
+);
+select ok(
+  (select last_cooked_at is not null from public.recipes
+     where id = '30000000-0000-4000-8000-000000000001'),
+  'cooking stamps the recipe so it can be rotated down the list'
+);
+
+select lives_ok(
+  $$select public.save_meal_plan_entry(
+      '40000000-0000-4000-8000-000000000001', null, current_date, 'dinner',
+      '30000000-0000-4000-8000-000000000001', null, 2, null
+    )$$,
+  'a recipe can be placed on the shared meal plan'
+);
+select throws_ok(
+  $$select public.save_meal_plan_entry(
+      '40000000-0000-4000-8000-000000000002', null, current_date, 'lunch',
+      null, '   ', null, null
+    )$$,
+  '22023',
+  'Choose a recipe or enter a title.',
+  'a planned meal needs either a recipe or a title'
+);
+select is(
+  (select added || '/' || skipped
+     from public.add_meal_plan_to_groceries(current_date, current_date)),
+  '2/1',
+  'the whole week can be shopped for in one pass'
+);
+select throws_ok(
+  $$select public.add_meal_plan_to_groceries(current_date, current_date - 1)$$,
+  '22023',
+  'Enter a valid date range.',
+  'a backwards plan range is rejected'
+);
+
+select is(public.claim_scan_credit(2), 1, 'claiming a scan reports the credits left today');
+select is(public.claim_scan_credit(2), 0, 'the second scan uses the last credit');
+select throws_ok(
+  $$select public.claim_scan_credit(2)$$,
+  '53400',
+  'You have used all 2 scans for today.',
+  'the daily recognition allowance is enforced by the database'
+);
+select lives_ok(
+  $$insert into public.scanned_products (household_id, barcode, name)
+    values (current_setting('test.alpha_household_id')::uuid, '3017624010701', 'Nutella')$$,
+  'a member can cache a scanned product for their household'
+);
+
+set local request.jwt.claim.sub = '00000000-0000-4000-8000-000000000003';
+select is(
+  (select count(*)::integer from public.scanned_products),
+  0,
+  'RLS hides another household product cache'
+);
+select is(
+  (select count(*)::integer from public.recipes),
+  0,
+  'RLS hides another household recipes'
+);
+select is(
+  (select count(*)::integer from public.meal_plan_entries),
+  0,
+  'RLS hides another household meal plan'
+);
+select throws_ok(
+  $$select public.delete_recipe('30000000-0000-4000-8000-000000000001', 1)$$,
+  'P0002',
+  'That recipe is no longer available.',
+  'another household cannot delete a recipe it cannot see'
 );
 
 set local request.jwt.claim.sub = '00000000-0000-4000-8000-000000000001';

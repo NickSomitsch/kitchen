@@ -27,7 +27,13 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
-        Update: { name?: string; join_code?: string; updated_at?: string }
+        Update: {
+          name?: string
+          join_code?: string
+          diet_tags?: string[]
+          avoid_ingredients?: string[]
+          updated_at?: string
+        }
         Relationships: []
       }
       household_members: {
@@ -60,6 +66,11 @@ export interface Database {
           location_id?: string | null
           notes?: string | null
           low_stock_threshold?: number | null
+          barcode?: string | null
+          brand?: string | null
+          image_url?: string | null
+          nutrition?: Nutrition | null
+          expires_on?: string | null
           created_by: string
         }
         Update: {
@@ -70,11 +81,43 @@ export interface Database {
           location_id?: string | null
           notes?: string | null
           low_stock_threshold?: number | null
+          barcode?: string | null
+          brand?: string | null
+          image_url?: string | null
+          nutrition?: Nutrition | null
+          expires_on?: string | null
         }
         Relationships: []
       }
       grocery_items: {
         Row: GroceryItemRow
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      scanned_products: {
+        Row: ScannedProduct
+        Insert: Omit<ScannedProduct, 'created_at' | 'updated_at' | 'allergens' | 'source'> & {
+          allergens?: string[]
+          source?: 'openfoodfacts' | 'manual'
+        }
+        Update: Partial<Omit<ScannedProduct, 'household_id' | 'barcode'>>
+        Relationships: []
+      }
+      recipes: {
+        Row: RecipeRow
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      recipe_ingredients: {
+        Row: RecipeIngredientRow
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      meal_plan_entries: {
+        Row: MealPlanEntryRow
         Insert: never
         Update: never
         Relationships: []
@@ -175,11 +218,57 @@ export interface Database {
         Returns: Json
       }
       shares_household: { Args: { other_user_id: string }; Returns: boolean }
+      save_recipe: {
+        Args: {
+          recipe_id: string | null
+          expected_version: number | null
+          recipe: Json
+          ingredients: Json
+        }
+        Returns: { id: string; version: number }[]
+      }
+      delete_recipe: { Args: { recipe_id: string; expected_version: number }; Returns: undefined }
+      set_recipe_favorite: { Args: { recipe_id: string; favorite: boolean }; Returns: undefined }
+      add_recipe_to_groceries: {
+        Args: { recipe_id: string; target_servings?: number | null }
+        Returns: { added: number; skipped: number }[]
+      }
+      log_recipe_cooked: {
+        Args: {
+          recipe_id: string
+          target_servings?: number | null
+          consume?: boolean
+          entry_id?: string | null
+        }
+        Returns: { deducted: number; unmatched: number }[]
+      }
+      save_meal_plan_entry: {
+        Args: {
+          entry_id: string | null
+          expected_version: number | null
+          planned_on: string
+          slot: MealSlot
+          recipe_id?: string | null
+          entry_title?: string | null
+          entry_servings?: number | null
+          entry_notes?: string | null
+        }
+        Returns: { id: string; version: number }[]
+      }
+      delete_meal_plan_entry: {
+        Args: { entry_id: string; expected_version: number }
+        Returns: undefined
+      }
+      add_meal_plan_to_groceries: {
+        Args: { from_date: string; to_date: string }
+        Returns: { added: number; skipped: number }[]
+      }
     }
     Enums: {
       inventory_unit: Unit
       grocery_item_source: GroceryItemSource
       grocery_item_status: GroceryItemStatus
+      meal_slot: MealSlot
     }
     CompositeTypes: Record<string, never>
   }
@@ -196,6 +285,8 @@ export interface Household {
   id: string
   name: string
   join_code: string
+  diet_tags: string[]
+  avoid_ingredients: string[]
   created_by: string | null
   created_at: string
   updated_at: string
@@ -227,6 +318,23 @@ export interface StorageLocation {
   updated_at: string
 }
 
+export interface Nutrition {
+  basis: 'g' | 'ml'
+  per: number
+  energy_kcal: number | null
+  fat: number | null
+  saturated_fat: number | null
+  carbohydrates: number | null
+  sugars: number | null
+  fibre: number | null
+  proteins: number | null
+  salt: number | null
+  serving_size: string | null
+  nutriscore: string | null
+  source: 'openfoodfacts' | 'manual'
+  updated_at: string
+}
+
 export interface InventoryItemRow {
   id: string
   household_id: string
@@ -237,6 +345,11 @@ export interface InventoryItemRow {
   location_id: string | null
   notes: string | null
   low_stock_threshold: number | null
+  barcode: string | null
+  brand: string | null
+  image_url: string | null
+  nutrition: Nutrition | null
+  expires_on: string | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -294,10 +407,13 @@ export interface PurchaseInput {
   unit: Unit | null
   target_inventory_item_id: string | null
   new_location_id: string | null
+  new_expires_on: string | null
 }
 
 export type StockFilter = 'all' | 'in-stock' | 'out-of-stock' | 'low-stock'
-export type InventorySortField = 'name' | 'quantity' | 'category' | 'location' | 'updated_at'
+export type ExpiryFilter = 'all' | 'expiring' | 'expired' | 'dated'
+export type InventorySortField =
+  | 'name' | 'quantity' | 'category' | 'location' | 'updated_at' | 'expires_on'
 export type SortDirection = 'asc' | 'desc'
 
 export interface InventorySort {
@@ -311,6 +427,7 @@ export interface InventoryFilters {
   locationIds: string[]
   units: Unit[]
   stock: StockFilter
+  expiry: ExpiryFilter
 }
 
 export interface HouseholdContext {
@@ -326,6 +443,11 @@ export interface ItemInput {
   location_id: string | null
   notes: string | null
   low_stock_threshold: number | null
+  barcode: string | null
+  brand: string | null
+  image_url: string | null
+  nutrition: Nutrition | null
+  expires_on: string | null
 }
 
 export type OfflineOperationKind =
@@ -366,4 +488,194 @@ export interface SyncConflict {
 export interface LocalRecordMeta {
   sync_status: LocalSyncStatus
   operation_id: string
+}
+
+export interface ScannedProduct {
+  household_id: string
+  barcode: string
+  name: string
+  brand: string | null
+  image_url: string | null
+  package_quantity: number | null
+  package_unit: Unit | null
+  nutrition: Nutrition | null
+  ingredients_text: string | null
+  allergens: string[]
+  source: 'openfoodfacts' | 'manual'
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** A product resolved from a barcode, before it becomes an inventory item. */
+export interface ProductFacts {
+  barcode: string
+  name: string
+  brand: string | null
+  image_url: string | null
+  package_quantity: number | null
+  package_unit: Unit | null
+  nutrition: Nutrition | null
+  ingredients_text: string | null
+  allergens: string[]
+  source: 'openfoodfacts' | 'manual'
+  origin: 'network' | 'cache'
+}
+
+export interface RecipeIngredientRow {
+  id: string
+  household_id: string
+  recipe_id: string
+  inventory_item_id: string | null
+  name: string
+  quantity: number | null
+  unit: Unit | null
+  optional: boolean
+  position: number
+  created_at: string
+}
+
+export interface RecipeRow {
+  id: string
+  household_id: string
+  name: string
+  description: string | null
+  instructions: string | null
+  servings: number
+  prep_minutes: number | null
+  cook_minutes: number | null
+  source_url: string | null
+  image_url: string | null
+  tags: string[]
+  is_favorite: boolean
+  last_cooked_at: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  version: number
+}
+
+export interface Recipe extends RecipeRow {
+  ingredients: RecipeIngredientRow[]
+}
+
+export interface RecipeIngredientInput {
+  name: string
+  quantity: number | null
+  unit: Unit | null
+  optional: boolean
+  inventory_item_id: string | null
+}
+
+export interface RecipeInput {
+  name: string
+  description: string | null
+  instructions: string | null
+  servings: number
+  prep_minutes: number | null
+  cook_minutes: number | null
+  source_url: string | null
+  image_url: string | null
+  tags: string[]
+  ingredients: RecipeIngredientInput[]
+}
+
+export type MealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack'
+
+export interface MealPlanEntryRow {
+  id: string
+  household_id: string
+  planned_on: string
+  slot: MealSlot
+  recipe_id: string | null
+  title: string | null
+  servings: number | null
+  notes: string | null
+  cooked_at: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  version: number
+}
+
+export interface MealPlanEntry extends MealPlanEntryRow {
+  recipe: Pick<RecipeRow, 'id' | 'name' | 'servings' | 'image_url' | 'prep_minutes' | 'cook_minutes'> | null
+}
+
+export interface MealPlanEntryInput {
+  planned_on: string
+  slot: MealSlot
+  recipe_id: string | null
+  title: string | null
+  servings: number | null
+  notes: string | null
+}
+
+/** Why a single ingredient counts as covered, short, or missing. */
+export type IngredientCoverage = 'stocked' | 'short' | 'missing'
+
+export interface IngredientMatch {
+  ingredient: RecipeIngredientRow
+  coverage: IngredientCoverage
+  item: InventoryItem | null
+  /** Amount still required, in the ingredient's own unit. */
+  shortfall: number | null
+  /** True when the stocked item cannot be compared to the ingredient's unit. */
+  incomparable: boolean
+}
+
+export interface RecipeMatch {
+  recipe: Recipe
+  matches: IngredientMatch[]
+  required: number
+  covered: number
+  /** 0–1 share of required ingredients that are in stock. */
+  coverage: number
+  /** Inventory items this recipe would use up before they expire. */
+  rescues: InventoryItem[]
+  totalMinutes: number | null
+  conflicts: string[]
+  score: number
+}
+
+export interface RecipeFilters {
+  search: string
+  tags: string[]
+  maxMinutes: number | null
+  favoritesOnly: boolean
+  readyOnly: boolean
+  hideConflicts: boolean
+}
+
+export type RecipeSortField = 'match' | 'name' | 'time' | 'recent'
+
+export type ScanMode = 'product' | 'receipt'
+
+/** One line a vision scan proposes, always confirmed by a person before it is applied. */
+export interface ScanCandidate {
+  name: string
+  brand: string | null
+  quantity: number | null
+  unit: Unit | null
+  category: string | null
+  confidence: number
+  price: number | null
+  note: string | null
+}
+
+export interface ScanResult {
+  mode: ScanMode
+  candidates: ScanCandidate[]
+  currency: string | null
+  store: string | null
+  purchased_on: string | null
+  notice: string | null
+  /** Which recognition provider answered, for support and debugging. */
+  provider?: 'gemini' | 'anthropic'
+  remaining_today?: number | null
+}
+
+export interface HouseholdPreferencesInput {
+  diet_tags: string[]
+  avoid_ingredients: string[]
 }
