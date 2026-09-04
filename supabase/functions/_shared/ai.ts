@@ -50,9 +50,44 @@ export interface GenerateRequest {
   maxOutputTokens?: number
 }
 
-async function withGemini(request: GenerateRequest): Promise<unknown> {
+/**
+ * Model names get retired, and a key is not always granted every model. Rather than
+ * hard-failing on a stale id, ask the key what it can actually run and keep the
+ * answer for the lifetime of the instance.
+ */
+let resolvedGeminiModel: string | null = null
+
+function rankModel(name: string) {
+  // Cheapest capable tier first, then newest. Anything that cannot take a prompt
+  // and return text is excluded before ranking.
+  const version = Number(/(\d+(?:\.\d+)?)/.exec(name)?.[1] ?? '0')
+  if (name.includes('flash-lite')) return 3000 + version
+  if (name.includes('flash')) return 2000 + version
+  if (name.includes('pro')) return 1000 + version
+  return version
+}
+
+async function usableModels(ai: GoogleGenAI): Promise<string[]> {
+  const names: string[] = []
+  const pager = await ai.models.list()
+  for await (const model of pager) {
+    const name = (model.name ?? '').replace(/^models\//, '')
+    if (!name) continue
+    if (model.supportedActions?.length && !model.supportedActions.includes('generateContent')) continue
+    if (/embedding|aqa|tts|live|audio|image-generation|imagen|veo|robotics/i.test(name)) continue
+    names.push(name)
+    if (names.length >= 200) break
+  }
+  return names.sort((a, b) => rankModel(b) - rankModel(a))
+}
+
+async function withGemini(request: GenerateRequest, retried = false): Promise<unknown> {
   const apiKey = Deno.env.get('GEMINI_API_KEY')!
-  const model = Deno.env.get('GEMINI_MODEL')?.trim() || 'gemini-2.5-flash-lite'
+  // A resolved model wins over the configured one, otherwise a stale GEMINI_MODEL
+  // would be retried forever.
+  const model = resolvedGeminiModel
+    || Deno.env.get('GEMINI_MODEL')?.trim()
+    || 'gemini-2.5-flash-lite'
   const ai = new GoogleGenAI({ apiKey })
 
   const parts: Record<string, unknown>[] = []
@@ -104,7 +139,17 @@ async function withGemini(request: GenerateRequest): Promise<unknown> {
         throw new ProviderError(503, 'The AI API key was rejected.')
       }
       if (error.status === 404) {
-        throw new ProviderError(503, `The model "${model}" is not available for this key.`)
+        const available = await usableModels(ai).catch(() => [] as string[])
+        const fallback = retried ? undefined : available.find((name) => name !== model)
+        if (fallback) {
+          console.warn(`ai gemini: "${model}" unavailable, falling back to "${fallback}"`)
+          resolvedGeminiModel = fallback
+          return withGemini(request, true)
+        }
+        throw new ProviderError(
+          503,
+          `The model "${model}" is not available for this key${available.length ? `. Available: ${available.slice(0, 5).join(', ')}` : ''}.`,
+        )
       }
       console.error('ai gemini error', error.status, error.message)
       throw new ProviderError(502, 'The request failed. Try again.')
