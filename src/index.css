@@ -532,6 +532,24 @@ a { color: inherit; }
 .planner-add:hover { border-color: #9db8a8; color: var(--forest); background: #f4f8f2; }
 
 /* Five nav destinations need the room the account name was using. */
+/* Recipe suggestions */
+.suggestions { border: 1px solid #d8e1d8; background: linear-gradient(180deg, #f6faf4, var(--paper)); border-radius: 16px; padding: 1rem 1.1rem 1.1rem; margin-bottom: 1.25rem; }
+.suggestions-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.suggestions-head h2 { display: flex; align-items: center; gap: .45rem; margin: 0 0 .3rem; font-family: Georgia, serif; font-weight: 500; font-size: 1.2rem; color: var(--forest-dark); }
+.suggestions-head p { margin: 0; color: var(--muted); font-size: .78rem; line-height: 1.55; max-width: 46ch; }
+.suggestions-controls { display: flex; align-items: center; gap: .55rem; flex-wrap: wrap; }
+.suggestions-note { width: 100%; margin-top: .85rem; }
+.suggestions > .notice, .suggestions > .inventory-skeleton { margin-top: .85rem; }
+.suggestion-list { list-style: none; padding: 0; margin: .9rem 0 0; display: flex; flex-direction: column; gap: .55rem; }
+.suggestion-list li { display: flex; align-items: center; gap: .9rem; padding: .8rem .9rem; border: 1px solid var(--line); border-radius: 13px; background: var(--paper); }
+.suggestion-list li.has-conflict { border-color: #e4c3bd; }
+.suggestion-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .25rem; }
+.suggestion-title { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
+.suggestion-title strong { font-size: .92rem; color: var(--ink); }
+.suggestion-body > p { margin: 0; color: var(--muted); font-size: .78rem; line-height: 1.5; }
+.suggestion-coverage { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; color: #2f6b49 !important; font-weight: 700; font-size: .74rem !important; }
+.suggestion-ingredients { color: #8a938e !important; font-size: .72rem !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 @media (max-width: 1180px) {
   .account-copy { display: none; }
 }
@@ -643,4 +661,12 @@ a { color: inherit; }
   .ingredient-check li { flex-wrap: wrap; }
   .coverage-note { width: 100%; text-align: left; padding-left: 1.9rem; }
   .scanner-manual { flex-direction: column; align-items: stretch; }
+}
+
+@media (max-width: 640px) {
+  .suggestions-head { flex-direction: column; }
+  .suggestions-controls { width: 100%; justify-content: space-between; }
+  .suggestion-list li { flex-direction: column; align-items: stretch; gap: .6rem; }
+  .suggestion-list li .button { width: 100%; }
+  .suggestion-ingredients { white-space: normal; }
 }

@@ -7,6 +7,7 @@ import {
   Clock,
   Heart,
   Search,
+  Sparkles,
   Trash2,
   Users,
 } from 'lucide-react'
@@ -22,6 +23,7 @@ import {
 import { AppShell } from '../components/AppShell'
 import { RecipeDetail } from '../components/RecipeDetail'
 import { RecipeForm } from '../components/RecipeForm'
+import { RecipeSuggestions } from '../components/RecipeSuggestions'
 import { Button, ErrorNotice, LoadingScreen, Modal } from '../components/ui'
 import { useHousehold } from '../hooks/useHousehold'
 import { getErrorMessage } from '../lib/errors'
@@ -79,6 +81,7 @@ export function RecipesPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Recipe | undefined>()
   const [deleting, setDeleting] = useState<Recipe | undefined>()
+  const [suggestOpen, setSuggestOpen] = useState(false)
 
   const householdId = household.data?.household.id ?? ''
   const recipes = useQuery({
@@ -149,11 +152,26 @@ export function RecipesPage() {
             </p>
           </div>
           <div className="heading-actions">
-            <Button onClick={() => { setEditing(undefined); setFormOpen(true) }}>
+            <Button
+              variant={suggestOpen ? 'secondary' : 'primary'}
+              onClick={() => setSuggestOpen((open) => !open)}
+            >
+              <Sparkles size={18} /> What can I cook?
+            </Button>
+            <Button variant="secondary" onClick={() => { setEditing(undefined); setFormOpen(true) }}>
               <CirclePlus size={18} /> Add recipe
             </Button>
           </div>
         </header>
+
+        {suggestOpen && household.data ? (
+          <RecipeSuggestions
+            householdId={householdId}
+            inventory={items}
+            household={household.data.household}
+            onSaved={() => void recipes.refetch()}
+          />
+        ) : null}
 
         <section className="inventory-tools" aria-label="Search and filter recipes">
           <label className="search-box">
@@ -231,15 +249,20 @@ export function RecipesPage() {
         ) : !allRecipes.length ? (
           <section className="empty-state">
             <div className="empty-illustration"><ChefHat size={31} /><span /></div>
-            <p className="eyebrow">Nothing to cook yet</p>
-            <h2>Add your first recipe</h2>
+            <p className="eyebrow">Nothing saved yet</p>
+            <h2>See what your kitchen can make</h2>
             <p>
-              Once a recipe lists its ingredients, Kitchen shows how much of it you already
-              have and can put the rest on the grocery list.
+              Kitchen can suggest dishes from what you already have, favouring anything
+              close to its date. Keep the ones you like and they join your own recipes.
             </p>
-            <Button onClick={() => { setEditing(undefined); setFormOpen(true) }}>
-              <CirclePlus size={18} /> Add a recipe
-            </Button>
+            <div className="empty-actions">
+              <Button onClick={() => setSuggestOpen(true)}>
+                <Sparkles size={18} /> Suggest meals
+              </Button>
+              <Button variant="secondary" onClick={() => { setEditing(undefined); setFormOpen(true) }}>
+                <CirclePlus size={18} /> Add one myself
+              </Button>
+            </div>
           </section>
         ) : !ranked.length ? (
           <section className="empty-state compact">

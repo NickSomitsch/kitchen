@@ -21,6 +21,7 @@ import type {
   ScanMode,
   ScanResult,
   ScannedProduct,
+  SuggestionResult,
   GroceryItemInput,
   Household,
   HouseholdContext,
@@ -456,6 +457,38 @@ export async function recognizeImage(
     )
   }
   if (!data) throw new Error('Image recognition returned no result.')
+  return data
+}
+
+/**
+ * Asks for dishes cookable from what the household has. The function reads the
+ * inventory itself with the caller's token, so nothing is sent from the browser.
+ */
+export async function suggestRecipes(servings: number, note: string): Promise<SuggestionResult> {
+  requireOnline()
+  const { data, error } = await supabase.functions.invoke<SuggestionResult>('suggest-recipes', {
+    body: { servings, note: note.trim() || undefined },
+  })
+  if (error) {
+    const response = (error as { context?: Response }).context
+    if (response) {
+      const body = await response.json().catch(() => null) as { error?: string } | null
+      if (response.status === 404) {
+        throw new RecognitionUnavailableError(
+          'Suggestions are not available. Deploy the suggest-recipes function to enable them.',
+        )
+      }
+      const message = body?.error ?? 'Suggestions failed.'
+      if (response.status === 501 || response.status === 503) {
+        throw new RecognitionUnavailableError(message)
+      }
+      throw new Error(message)
+    }
+    throw new RecognitionUnavailableError(
+      'Suggestions are not available. Deploy the suggest-recipes function to enable them.',
+    )
+  }
+  if (!data) throw new Error('Suggestions returned no result.')
   return data
 }
 

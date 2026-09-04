@@ -25,6 +25,7 @@ A mobile-first shared kitchen assistant. Household members track what is on hand
 - On-device barcode scanning with nutrition lookup from Open Food Facts
 - An editable nutrition panel and a remembered product cache per household
 - Photo and receipt recognition that proposes items for review before anything is added
+- Recipe suggestions generated from what the kitchen actually has
 - Recipes scored by how much of each one the kitchen already holds
 - One-tap shopping for the ingredients a recipe is short of
 - “Cooked it” that subtracts what a meal used and feeds the low-stock rules
@@ -57,6 +58,15 @@ Two providers are supported and produce the same result shape, so the app never 
 Gemini is the only provider that starts on its own. Anthropic is opt-in and needs `SCAN_PROVIDER=anthropic` as well as its key, so a stray `ANTHROPIC_API_KEY` can never begin billing by accident, and its SDK is not even loaded unless that provider is chosen. `GEMINI_MODEL` and `ANTHROPIC_MODEL` override the model. Note that Google may use **free-tier** inputs and outputs to improve its models, which is worth weighing against receipt photos; Gemini's paid tier and Anthropic's API do not carry that clause.
 
 ## Recipes and meal planning
+
+Recipes do not have to be typed in first. **What can I cook?** reads the kitchen and
+proposes dishes built around what is actually on hand, favouring anything close to its
+date. Suggestions are never stored: you keep the ones worth having, and a kept
+suggestion becomes an ordinary recipe that matches, shops, cooks, and plans like any
+other. The model proposes the dish, but the coverage figure beside it is measured
+locally against real inventory, so a suggestion cannot claim you have something you do
+not. Suggestions need the `suggest-recipes` Edge Function and draw on their own daily
+allowance, separate from image recognition.
 
 Recipe ranking is deliberately transparent rather than a black box. The headline number is plain ingredient coverage — “7 of 9 ingredients in stock” — measured by matching each ingredient to an inventory item by explicit link or by name, then converting units where they are comparable. Small bonuses only break ties between close matches: using something near its best-before date, a favourite, a recipe under thirty minutes, or a matching diet tag. Anything on the household's avoid list is flagged and sorted last.
 
@@ -120,7 +130,11 @@ Maintainers can also run `npm run test:hosted` with the three server-side Supaba
    npx supabase functions deploy scan-image
    ```
 
-   `SCAN_DAILY_LIMIT` (default 40) tunes the per-person daily allowance, and `SCAN_EFFORT` (`low`, `medium`, or `high`; default `medium`) applies to the Anthropic provider only. Keys live only in the function's environment; never add one to this repository or to a `VITE_` variable.
+   ```bash
+   npx supabase functions deploy suggest-recipes
+   ```
+
+   Both functions share the one provider key. `SCAN_DAILY_LIMIT` (default 40) and `SUGGEST_DAILY_LIMIT` (default 20) tune the two per-person daily allowances, which the database counts separately. `SCAN_EFFORT` (`low`, `medium`, or `high`; default `medium`) applies to the Anthropic provider only. Keys live only in the function's environment; never add one to this repository or to a `VITE_` variable.
 
 Pushing `main` verifies the app and deploys `dist/` to GitHub Pages. The generated service worker is scoped to `/kitchen/`, precaches only public application assets, and does not cache authenticated Supabase responses. The publishable key is designed for browser use; access is enforced by database policies. Never add a Supabase secret or service-role key to this repository.
 

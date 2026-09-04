@@ -5,24 +5,12 @@
 // security still decides who may scan. Nothing here writes to the inventory: the
 // function only proposes candidates, and a person confirms them in the app.
 import { createClient } from 'npm:@supabase/supabase-js@2.112.4'
-import { ProviderError, recognize, resolveProvider, type ScanMode } from './providers.ts'
+import { ProviderError, corsHeaders, json, notConfigured, resolveProvider } from '../_shared/ai.ts'
+import { recognize, type ScanMode } from './providers.ts'
 
 const MAX_IMAGE_CHARS = 4_500_000
 const ALLOWED_MEDIA = ['image/jpeg', 'image/png', 'image/webp'] as const
 const DAILY_SCAN_LIMIT = Number(Deno.env.get('SCAN_DAILY_LIMIT') ?? '40')
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
-
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
-}
 
 /** Splits a `data:image/jpeg;base64,...` URL into the parts a model needs. */
 function parseDataUrl(value: unknown) {
@@ -40,11 +28,7 @@ Deno.serve(async (request) => {
   if (request.method !== 'POST') return json({ error: 'Use POST.' }, 405)
 
   const provider = resolveProvider()
-  if (!provider) {
-    return json({
-      error: 'Image recognition is not configured. Set the GEMINI_API_KEY function secret.',
-    }, 501)
-  }
+  if (!provider) return notConfigured()
 
   const authorization = request.headers.get('Authorization')
   if (!authorization) return json({ error: 'You must be signed in.' }, 401)
@@ -88,7 +72,7 @@ Deno.serve(async (request) => {
   }
 
   try {
-    const outcome = await recognize(provider, { mode, ...image, categories })
+    const outcome = await recognize(provider, { mode, image, categories })
     return json({
       mode,
       ...outcome,

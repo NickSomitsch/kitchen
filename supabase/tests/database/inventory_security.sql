@@ -1,5 +1,5 @@
 begin;
-select plan(76);
+select plan(80);
 
 insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data)
 values
@@ -481,6 +481,24 @@ select throws_ok(
   'You have used all 2 scans for today.',
   'the daily recognition allowance is enforced by the database'
 );
+select is(
+  public.claim_ai_credit('suggest', 2), 1,
+  'recipe suggestions draw on their own allowance, not the exhausted scan one'
+);
+select is(public.claim_ai_credit('suggest', 2), 0, 'the second suggestion uses the last credit');
+select throws_ok(
+  $$select public.claim_ai_credit('suggest', 2)$$,
+  '53400',
+  null,
+  'each AI feature is capped independently'
+);
+select throws_ok(
+  $$select public.claim_ai_credit('nonsense', 5)$$,
+  '22023',
+  'Unknown AI feature.',
+  'an unrecognised AI feature is rejected'
+);
+
 select lives_ok(
   $$insert into public.scanned_products (household_id, barcode, name)
     values (current_setting('test.alpha_household_id')::uuid, '3017624010701', 'Nutella')$$,

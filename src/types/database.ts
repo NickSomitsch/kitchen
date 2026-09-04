@@ -218,6 +218,12 @@ export interface Database {
         Returns: Json
       }
       shares_household: { Args: { other_user_id: string }; Returns: boolean }
+      claim_ai_credit: {
+        Args: { ai_feature: string; daily_limit?: number }
+        Returns: number
+      }
+      claim_scan_credit: { Args: { daily_limit?: number }; Returns: number }
+      scans_used_today: { Args: Record<string, never>; Returns: number }
       save_recipe: {
         Args: {
           recipe_id: string | null
@@ -671,6 +677,30 @@ export interface ScanResult {
   purchased_on: string | null
   notice: string | null
   /** Which recognition provider answered, for support and debugging. */
+  provider?: 'gemini' | 'anthropic'
+  remaining_today?: number | null
+}
+
+/** A dish the model proposed. Coverage is recomputed locally, never trusted from it. */
+export interface RecipeSuggestion {
+  name: string
+  description: string | null
+  servings: number
+  prep_minutes: number | null
+  cook_minutes: number | null
+  tags: string[]
+  instructions: string | null
+  ingredients: {
+    name: string
+    quantity: number | null
+    unit: Unit | null
+    optional: boolean
+  }[]
+}
+
+export interface SuggestionResult {
+  suggestions: RecipeSuggestion[]
+  notice: string | null
   provider?: 'gemini' | 'anthropic'
   remaining_today?: number | null
 }

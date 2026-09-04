@@ -1,10 +1,9 @@
-// Recognition providers. Both return the same shape, so the browser and the
-// confirmation screen never need to know which one answered.
-import { ApiError, GoogleGenAI } from 'npm:@google/genai@2.21.0'
+// Scan-specific prompts, schema, and result normalising. Provider selection and the
+// model calls themselves live in ../_shared/ai.ts, shared with recipe suggestions.
 import { z } from 'npm:zod@4.5.4'
+import { generateJson, type InlineImage, type Provider } from '../_shared/ai.ts'
 
 export type ScanMode = 'product' | 'receipt'
-export type Provider = 'gemini' | 'anthropic'
 
 export const UNITS = ['g', 'kg', 'ml', 'l', 'piece', 'package'] as const
 
@@ -25,16 +24,6 @@ export interface ScanOutcome {
   store: string | null
   purchased_on: string | null
   notice: string | null
-}
-
-export class ProviderError extends Error {
-  status: number
-
-  constructor(status: number, message: string) {
-    super(message)
-    this.name = 'ProviderError'
-    this.status = status
-  }
 }
 
 export const SYSTEM_PROMPT = `You identify grocery products for a shared kitchen inventory app.
@@ -89,19 +78,17 @@ const SCAN_JSON_SCHEMA = {
   required: ['candidates'],
 } as const
 
-const CandidateSchema = z.object({
-  name: z.string(),
-  brand: z.string().nullable(),
-  quantity: z.number().nullable(),
-  unit: z.enum(UNITS).nullable(),
-  category: z.string().nullable(),
-  confidence: z.number(),
-  price: z.number().nullable(),
-  note: z.string().nullable(),
-})
-
 const ScanSchema = z.object({
-  candidates: z.array(CandidateSchema),
+  candidates: z.array(z.object({
+    name: z.string(),
+    brand: z.string().nullable(),
+    quantity: z.number().nullable(),
+    unit: z.enum(UNITS).nullable(),
+    category: z.string().nullable(),
+    confidence: z.number(),
+    price: z.number().nullable(),
+    note: z.string().nullable(),
+  })),
   currency: z.string().nullable(),
   store: z.string().nullable(),
   purchased_on: z.string().nullable(),
@@ -151,146 +138,20 @@ export function normalizeScan(raw: unknown): ScanOutcome {
   }
 }
 
-/**
- * Gemini is the only provider that can start on its own. Anthropic is opt-in and
- * needs SCAN_PROVIDER=anthropic as well as its key, so a stray ANTHROPIC_API_KEY
- * can never begin billing by accident.
- */
-export function resolveProvider(): Provider | null {
-  const requested = Deno.env.get('SCAN_PROVIDER')?.trim().toLowerCase()
-  const hasGemini = Boolean(Deno.env.get('GEMINI_API_KEY'))
-  const hasAnthropic = Boolean(Deno.env.get('ANTHROPIC_API_KEY'))
-  if (requested === 'anthropic') return hasAnthropic ? 'anthropic' : null
-  if (requested === 'gemini') return hasGemini ? 'gemini' : null
-  return hasGemini ? 'gemini' : null
-}
-
 export interface RecognizeInput {
   mode: ScanMode
-  mediaType: string
-  data: string
+  image: InlineImage
   categories: string[]
 }
 
-export async function recognizeWithGemini(input: RecognizeInput): Promise<ScanOutcome> {
-  const apiKey = Deno.env.get('GEMINI_API_KEY')!
-  const model = Deno.env.get('GEMINI_MODEL')?.trim() || 'gemini-2.5-flash-lite'
-  const ai = new GoogleGenAI({ apiKey })
-
-  try {
-    const response = await ai.models.generateContent({
-      model,
-      contents: [{
-        role: 'user',
-        parts: [
-          { inlineData: { mimeType: input.mediaType, data: input.data } },
-          { text: userPrompt(input.mode, input.categories) },
-        ],
-      }],
-      config: {
-        systemInstruction: SYSTEM_PROMPT,
-        responseMimeType: 'application/json',
-        responseJsonSchema: SCAN_JSON_SCHEMA,
-        temperature: 0,
-        maxOutputTokens: 8192,
-      },
-    })
-
-    const blockReason = response.promptFeedback?.blockReason
-    if (blockReason) {
-      throw new ProviderError(422, 'That image could not be processed. Try a different photo.')
-    }
-    const body = response.text
-    if (!body) {
-      const finish = response.candidates?.[0]?.finishReason
-      throw new ProviderError(
-        422,
-        finish === 'MAX_TOKENS'
-          ? 'That receipt was too long to read in one go. Try photographing it in two halves.'
-          : 'The photo could not be read. Try again with more light.',
-      )
-    }
-    return normalizeScan(JSON.parse(body))
-  } catch (error) {
-    if (error instanceof ProviderError) throw error
-    if (error instanceof SyntaxError) {
-      throw new ProviderError(502, 'The photo could not be read. Try again.')
-    }
-    if (error instanceof ApiError) {
-      if (error.status === 429) {
-        throw new ProviderError(429, 'The free daily quota for recognition is used up. Try again tomorrow.')
-      }
-      // Gemini reports a bad key as 400 API_KEY_INVALID rather than 401, so match
-      // on the reason as well as the status or a setup mistake looks like a fault.
-      const invalidKey = /API_KEY_INVALID|API key not valid/i.test(error.message)
-      if (error.status === 401 || error.status === 403 || invalidKey) {
-        throw new ProviderError(503, 'The recognition API key was rejected.')
-      }
-      if (error.status === 404) {
-        throw new ProviderError(503, `The recognition model "${model}" is not available for this key.`)
-      }
-      console.error('scan-image gemini error', error.status, error.message)
-      throw new ProviderError(502, 'Image recognition failed. Try again.')
-    }
-    throw error
-  }
-}
-
-export async function recognizeWithAnthropic(input: RecognizeInput): Promise<ScanOutcome> {
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY')!
-  const effort = (Deno.env.get('SCAN_EFFORT') ?? 'medium') as 'low' | 'medium' | 'high'
-  // Imported here rather than at module scope so the SDK is never even fetched
-  // unless someone explicitly opted this provider in.
-  const { default: Anthropic } = await import('npm:@anthropic-ai/sdk@0.123.0')
-  const { zodOutputFormat } = await import('npm:@anthropic-ai/sdk@0.123.0/helpers/zod')
-  const client = new Anthropic({ apiKey })
-
-  try {
-    const response = await client.messages.parse({
-      model: Deno.env.get('ANTHROPIC_MODEL')?.trim() || 'claude-opus-5',
-      max_tokens: 16000,
-      system: SYSTEM_PROMPT,
-      thinking: { type: 'adaptive' },
-      output_config: { format: zodOutputFormat(ScanSchema), effort },
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: {
-              type: 'base64',
-              media_type: input.mediaType as 'image/jpeg' | 'image/png' | 'image/webp',
-              data: input.data,
-            },
-          },
-          { type: 'text', text: userPrompt(input.mode, input.categories) },
-        ],
-      }],
-    })
-
-    if (response.stop_reason === 'refusal') {
-      throw new ProviderError(422, 'That image could not be processed. Try a different photo.')
-    }
-    if (!response.parsed_output) {
-      throw new ProviderError(422, 'The photo could not be read. Try again with more light.')
-    }
-    return normalizeScan(response.parsed_output)
-  } catch (error) {
-    if (error instanceof ProviderError) throw error
-    if (error instanceof Anthropic.RateLimitError) {
-      throw new ProviderError(429, 'Recognition is busy right now. Try again in a moment.')
-    }
-    if (error instanceof Anthropic.AuthenticationError) {
-      throw new ProviderError(503, 'The recognition API key was rejected.')
-    }
-    if (error instanceof Anthropic.APIError) {
-      console.error('scan-image anthropic error', error.status, error.message)
-      throw new ProviderError(502, 'Image recognition failed. Try again.')
-    }
-    throw error
-  }
-}
-
-export function recognize(provider: Provider, input: RecognizeInput) {
-  return provider === 'gemini' ? recognizeWithGemini(input) : recognizeWithAnthropic(input)
+export async function recognize(provider: Provider, input: RecognizeInput): Promise<ScanOutcome> {
+  const raw = await generateJson(provider, {
+    system: SYSTEM_PROMPT,
+    prompt: userPrompt(input.mode, input.categories),
+    jsonSchema: SCAN_JSON_SCHEMA,
+    zodSchema: ScanSchema,
+    image: input.image,
+    maxOutputTokens: 8192,
+  })
+  return normalizeScan(raw)
 }
