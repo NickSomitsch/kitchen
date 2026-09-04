@@ -1,4 +1,4 @@
-import { AlertTriangle, Boxes, CalendarDays, ChefHat, Cloud, Download, LogOut, RefreshCw, Settings, ShoppingCart, WifiOff } from 'lucide-react'
+import { AlertTriangle, Boxes, CalendarDays, ChefHat, Cloud, Download, House, LogOut, RefreshCw, Settings, ShoppingCart, WifiOff } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
@@ -75,7 +75,7 @@ export function AppShell({
   return (
     <div className="app-frame">
       <header className="app-header">
-        <NavLink to="/inventory" className="brand-link" aria-label="Kitchen inventory home">
+        <NavLink to="/home" className="brand-link" aria-label="Kitchen home">
           <div className="brand-mark"><span>K</span></div>
           <div className="brand-copy">
             <strong>Kitchen</strong>
@@ -83,6 +83,10 @@ export function AppShell({
           </div>
         </NavLink>
         <nav className="main-nav" aria-label="Main navigation">
+          <NavLink to="/home">
+            <House size={18} />
+            <span>Home</span>
+          </NavLink>
           <NavLink to="/inventory">
             <Boxes size={18} />
             <span>Inventory</span>

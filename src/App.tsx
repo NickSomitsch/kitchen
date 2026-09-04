@@ -12,6 +12,7 @@ const InventoryPage = lazy(() => import('./pages/InventoryPage').then((module) =
 const GroceryPage = lazy(() => import('./pages/GroceryPage').then((module) => ({ default: module.GroceryPage })))
 const OnboardingPage = lazy(() => import('./pages/OnboardingPage').then((module) => ({ default: module.OnboardingPage })))
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then((module) => ({ default: module.SettingsPage })))
+const HomePage = lazy(() => import('./pages/HomePage').then((module) => ({ default: module.HomePage })))
 const RecipesPage = lazy(() => import('./pages/RecipesPage').then((module) => ({ default: module.RecipesPage })))
 const PlannerPage = lazy(() => import('./pages/PlannerPage').then((module) => ({ default: module.PlannerPage })))
 
@@ -28,7 +29,7 @@ function HomeRoute() {
   if (loading) return <LoadingScreen />
   if (!user) return <Navigate to="/auth" replace />
   if (household.isLoading) return <LoadingScreen />
-  return <Navigate to={household.data ? '/inventory' : '/onboarding'} replace />
+  return <Navigate to={household.data ? '/home' : '/onboarding'} replace />
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -66,6 +67,10 @@ export function App() {
               <Route
                 path="/onboarding"
                 element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>}
+              />
+              <Route
+                path="/home"
+                element={<ProtectedRoute><HomePage /></ProtectedRoute>}
               />
               <Route
                 path="/inventory"

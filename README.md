@@ -16,6 +16,7 @@ A mobile-first shared kitchen assistant. Household members track what is on hand
 - Best-before dates with a “use soon” shelf, filters, and sorting
 - Purchase review that can restock an existing item, create a new item, or complete without stocking
 - Persistent purchase history with “add again” and clear-history controls
+- A home overview of recent items, what to use soon, groceries, and what to cook
 - Responsive phone cards and desktop table
 - Supabase Row Level Security and Realtime synchronization
 - Installable PWA with an offline application shell
@@ -81,6 +82,17 @@ The header shows connection and synchronization state. Conflicts retain the offl
 Pending commands remain until they synchronize or are discarded. Signing out clears cached household data and warns before discarding unsynchronized changes. Browser storage is scoped by user and household but is not separately encrypted; removing a member cannot erase data already cached on an offline device until that device reconnects.
 
 Barcode scanning works offline for products the household has scanned before, because the product cache and the WebAssembly decoder are both kept on the device after first use. Recipes and the meal plan are readable offline from the same seven-day cache, but saving them, looking up an unknown barcode, and image recognition all need a connection.
+
+## Icons
+
+`public/kitchen-icon.svg` is the single source of the mark. Every raster icon, including
+the multi-size `favicon.ico`, is generated from it:
+
+```bash
+npm install --no-save sharp && node scripts/generate-icons.mjs
+```
+
+`sharp` is deliberately not a project dependency, because icons change rarely.
 
 ## Local setup
 
