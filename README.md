@@ -53,7 +53,7 @@ Two providers are supported and produce the same result shape, so the app never 
 
 | Provider | Secrets required | Default model | Cost |
 | --- | --- | --- | --- |
-| Google Gemini | `GEMINI_API_KEY` | `gemini-2.5-flash-lite` | Free tier, no card required |
+| Google Gemini | `GEMINI_API_KEY` | `gemini-flash-lite-latest` | Free tier, no card required |
 | Anthropic Claude | `ANTHROPIC_API_KEY` **and** `SCAN_PROVIDER=anthropic` | `claude-opus-5` | Paid per scan |
 
 Gemini is the only provider that starts on its own. Anthropic is opt-in and needs `SCAN_PROVIDER=anthropic` as well as its key, so a stray `ANTHROPIC_API_KEY` can never begin billing by accident, and its SDK is not even loaded unless that provider is chosen. `GEMINI_MODEL` and `ANTHROPIC_MODEL` override the model. Note that Google may use **free-tier** inputs and outputs to improve its models, which is worth weighing against receipt photos; Gemini's paid tier and Anthropic's API do not carry that clause.

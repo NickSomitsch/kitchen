@@ -58,13 +58,14 @@ export interface GenerateRequest {
 let resolvedGeminiModel: string | null = null
 
 function rankModel(name: string) {
-  // Cheapest capable tier first, then newest. Anything that cannot take a prompt
-  // and return text is excluded before ranking.
+  // Cheapest capable tier first. Within a tier a "-latest" alias wins, because it
+  // keeps tracking the current model instead of ageing into another 404.
   const version = Number(/(\d+(?:\.\d+)?)/.exec(name)?.[1] ?? '0')
-  if (name.includes('flash-lite')) return 3000 + version
-  if (name.includes('flash')) return 2000 + version
-  if (name.includes('pro')) return 1000 + version
-  return version
+  const score = name.endsWith('-latest') ? 500 : version
+  if (name.includes('flash-lite')) return 3000 + score
+  if (name.includes('flash')) return 2000 + score
+  if (name.includes('pro')) return 1000 + score
+  return score
 }
 
 async function usableModels(ai: GoogleGenAI): Promise<string[]> {
@@ -87,7 +88,7 @@ async function withGemini(request: GenerateRequest, retried = false): Promise<un
   // would be retried forever.
   const model = resolvedGeminiModel
     || Deno.env.get('GEMINI_MODEL')?.trim()
-    || 'gemini-2.5-flash-lite'
+    || 'gemini-flash-lite-latest'
   const ai = new GoogleGenAI({ apiKey })
 
   const parts: Record<string, unknown>[] = []
