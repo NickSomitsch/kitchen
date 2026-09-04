@@ -1,3 +1,4 @@
+import { expiryState, isExpiringSoon } from './expiry'
 import type {
   InventoryFilters,
   InventoryItem,
@@ -143,6 +144,9 @@ export function filterAndSortInventory(
     if (filters.stock === 'in-stock' && item.quantity === 0) return false
     if (filters.stock === 'out-of-stock' && item.quantity !== 0) return false
     if (filters.stock === 'low-stock' && !isLowStock(item)) return false
+    if (filters.expiry === 'dated' && !item.expires_on) return false
+    if (filters.expiry === 'expiring' && !isExpiringSoon(item)) return false
+    if (filters.expiry === 'expired' && expiryState(item) !== 'expired') return false
     return true
   })
 
@@ -160,6 +164,13 @@ export function filterAndSortInventory(
         break
       case 'updated_at':
         result = new Date(left.updated_at).getTime() - new Date(right.updated_at).getTime()
+        break
+      case 'expires_on':
+        // Undated items always sort last, whichever direction is chosen.
+        if (!left.expires_on && !right.expires_on) result = 0
+        else if (!left.expires_on) return 1
+        else if (!right.expires_on) return -1
+        else result = left.expires_on.localeCompare(right.expires_on)
         break
       case 'quantity': {
         const leftValue = normalizedQuantity(left)

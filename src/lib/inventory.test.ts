@@ -28,6 +28,11 @@ function item(
     location_id: null,
     notes: null,
     low_stock_threshold: null,
+    barcode: null,
+    brand: null,
+    image_url: null,
+    nutrition: null,
+    expires_on: null,
     created_by: 'user-1',
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
@@ -69,6 +74,7 @@ const emptyFilters: InventoryFilters = {
   locationIds: [],
   units: [],
   stock: 'all',
+    expiry: 'all',
 }
 
 describe('quantity conversion', () => {
@@ -129,6 +135,7 @@ describe('inventory search and filters', () => {
         locationIds: ['fridge'],
         units: ['piece'],
         stock: 'in-stock',
+      expiry: 'all',
       },
       { field: 'name', direction: 'asc' },
     )

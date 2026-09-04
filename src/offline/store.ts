@@ -6,6 +6,7 @@ import type {
   InventoryItem,
   Json,
   OfflineOperation,
+  Nutrition,
   StorageLocation,
   Unit,
 } from '../types/database'
@@ -19,6 +20,9 @@ export type SnapshotCollection =
   | 'categories'
   | 'locations'
   | 'members'
+  | 'products'
+  | 'recipes'
+  | 'meal_plan'
 
 interface OfflineSnapshot {
   key: string
@@ -138,6 +142,11 @@ export function projectInventory(
         location_id: locationId,
         notes: value<string | null>(payload, 'notes'),
         low_stock_threshold: value<number | null>(payload, 'low_stock_threshold'),
+        barcode: value<string | null>(payload, 'barcode') ?? null,
+        brand: value<string | null>(payload, 'brand') ?? null,
+        image_url: value<string | null>(payload, 'image_url') ?? null,
+        nutrition: value<Nutrition | null>(payload, 'nutrition') ?? null,
+        expires_on: value<string | null>(payload, 'expires_on') ?? null,
         created_by: operation.user_id,
         created_at: operation.created_at,
         updated_at: operation.created_at,
@@ -160,6 +169,11 @@ export function projectInventory(
         location_id: locationId,
         notes: value<string | null>(payload, 'notes'),
         low_stock_threshold: value<number | null>(payload, 'low_stock_threshold'),
+        barcode: 'barcode' in payload ? value<string | null>(payload, 'barcode') : existing.barcode,
+        brand: 'brand' in payload ? value<string | null>(payload, 'brand') : existing.brand,
+        image_url: 'image_url' in payload ? value<string | null>(payload, 'image_url') : existing.image_url,
+        nutrition: 'nutrition' in payload ? value<Nutrition | null>(payload, 'nutrition') : existing.nutrition,
+        expires_on: 'expires_on' in payload ? value<string | null>(payload, 'expires_on') : existing.expires_on,
         category: categories.find((category) => category.id === categoryId) ?? null,
         location: locations.find((location) => location.id === locationId) ?? null,
         updated_at: operation.created_at,
@@ -183,6 +197,7 @@ export function projectInventory(
         items.set(existing.id, {
           ...existing,
           quantity: existing.quantity + converted,
+          expires_on: value<string | null>(payload, 'new_expires_on') ?? existing.expires_on,
           updated_at: operation.created_at,
           local_sync_status: localStatus(operation),
         })
@@ -198,6 +213,11 @@ export function projectInventory(
           location_id: value<string | null>(payload, 'new_location_id'),
           notes: value<string | null>(payload, 'notes'),
           low_stock_threshold: null,
+          barcode: null,
+          brand: null,
+          image_url: null,
+          nutrition: null,
+          expires_on: value<string | null>(payload, 'new_expires_on') ?? null,
           created_by: operation.user_id,
           created_at: operation.created_at,
           updated_at: operation.created_at,

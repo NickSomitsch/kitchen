@@ -10,6 +10,22 @@ const validItem = {
   notes: '',
   lowStockEnabled: false,
   lowStockThreshold: 0,
+  expiresOn: '',
+  barcode: '',
+  brand: '',
+  imageUrl: '',
+  nutrition: {
+    basis: 'g' as const,
+    energy_kcal: '',
+    fat: '',
+    saturated_fat: '',
+    carbohydrates: '',
+    sugars: '',
+    fibre: '',
+    proteins: '',
+    salt: '',
+    serving_size: '',
+  },
 }
 
 describe('item validation', () => {
@@ -48,8 +64,8 @@ describe('grocery validation', () => {
   })
 
   it('requires purchase details only when stocking inventory', () => {
-    expect(purchaseSchema.safeParse({ stockAction: 'none', quantity: '', unit: 'piece', targetInventoryItemId: '', locationId: '' }).success).toBe(true)
-    expect(purchaseSchema.safeParse({ stockAction: 'existing', quantity: '', unit: 'piece', targetInventoryItemId: '', locationId: '' }).success).toBe(false)
-    expect(purchaseSchema.safeParse({ stockAction: 'new', quantity: '2', unit: 'piece', targetInventoryItemId: '', locationId: '' }).success).toBe(true)
+    expect(purchaseSchema.safeParse({ stockAction: 'none', quantity: '', unit: 'piece', targetInventoryItemId: '', locationId: '', expiresOn: '' }).success).toBe(true)
+    expect(purchaseSchema.safeParse({ stockAction: 'existing', quantity: '', unit: 'piece', targetInventoryItemId: '', locationId: '', expiresOn: '' }).success).toBe(false)
+    expect(purchaseSchema.safeParse({ stockAction: 'new', quantity: '2', unit: 'piece', targetInventoryItemId: '', locationId: '', expiresOn: '' }).success).toBe(true)
   })
 })

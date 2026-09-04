@@ -115,6 +115,11 @@ export function GroceryPage() {
           location_id: inventoryItem.location_id,
           notes: inventoryItem.notes,
           low_stock_threshold: null,
+          expires_on: inventoryItem.expires_on,
+          barcode: inventoryItem.barcode,
+          brand: inventoryItem.brand,
+          image_url: inventoryItem.image_url,
+          nutrition: inventoryItem.nutrition,
         })
         return
       }

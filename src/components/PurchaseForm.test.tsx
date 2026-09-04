@@ -13,6 +13,7 @@ vi.mock('../api/kitchen', async (importOriginal) => {
 const inventory: InventoryItem = {
   id: 'inventory-1', household_id: 'household-1', name: 'Milk', quantity: .25, unit: 'l',
   category_id: null, location_id: null, notes: null, low_stock_threshold: .5,
+  barcode: null, brand: null, image_url: null, nutrition: null, expires_on: null,
   created_by: 'user-1', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
   version: 1, category: null, location: null,
 }

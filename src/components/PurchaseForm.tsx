@@ -36,6 +36,7 @@ export function PurchaseForm({
       unit: item.unit ?? defaultTarget?.unit ?? 'piece',
       targetInventoryItemId: defaultTarget?.id ?? '',
       locationId: '',
+      expiresOn: '',
     },
   })
   const stockAction = useWatch({ control, name: 'stockAction' })
@@ -57,6 +58,7 @@ export function PurchaseForm({
         unit: values.stockAction === 'none' ? null : values.unit,
         target_inventory_item_id: values.stockAction === 'existing' ? values.targetInventoryItemId : null,
         new_location_id: values.stockAction === 'new' ? (values.locationId || null) : null,
+        new_expires_on: values.stockAction === 'none' ? null : (values.expiresOn || null),
       }
       return completeGroceryItem(item, input)
     },
@@ -108,7 +110,7 @@ export function PurchaseForm({
           </label>
           {incompatible ? <p className="field-error full-width">Choose a unit compatible with {selectedTarget?.unit}.</p> : null}
           {stockAction === 'new' ? (
-            <label className="field full-width">
+            <label className="field">
               <span>Storage location <small>Optional</small></span>
               <select {...register('locationId')}>
                 <option value="">No location</option>
@@ -116,6 +118,11 @@ export function PurchaseForm({
               </select>
             </label>
           ) : null}
+          <label className="field">
+            <span>Best before <small>Optional</small></span>
+            <input type="date" {...register('expiresOn')} />
+            <FieldError message={errors.expiresOn?.message} />
+          </label>
         </div>
       ) : null}
 

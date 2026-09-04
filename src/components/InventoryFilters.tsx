@@ -115,6 +115,23 @@ export function InventoryFilters({
             <option value="low-stock">Low stock</option>
           </select>
         </label>
+        <label className="select-control compact">
+          <span className="sr-only">Best-before status</span>
+          <select
+            value={filters.expiry}
+            onChange={(event) =>
+              onFiltersChange({
+                ...filters,
+                expiry: event.target.value as InventoryFiltersValue['expiry'],
+              })
+            }
+          >
+            <option value="all">Any date</option>
+            <option value="expiring">Use soon</option>
+            <option value="expired">Past its date</option>
+            <option value="dated">Has a date</option>
+          </select>
+        </label>
         <div className="toolbar-spacer" />
         {activeCount ? (
           <Button variant="ghost" onClick={onClear} className="clear-filter">
@@ -140,6 +157,8 @@ export function InventoryFilters({
             <option value="quantity:desc">Quantity high–low</option>
             <option value="category:asc">Category A–Z</option>
             <option value="location:asc">Location A–Z</option>
+            <option value="expires_on:asc">Best before, soonest</option>
+            <option value="expires_on:desc">Best before, latest</option>
             <option value="updated_at:desc">Recently updated</option>
             <option value="updated_at:asc">Least recently updated</option>
           </select>
