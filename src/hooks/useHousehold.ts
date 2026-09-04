@@ -26,6 +26,9 @@ export function useHouseholdRealtime(householdId: string | undefined) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.locations(householdId) })
       void queryClient.invalidateQueries({ queryKey: queryKeys.members(householdId) })
       void queryClient.invalidateQueries({ queryKey: queryKeys.groceries(householdId) })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.recipes(householdId) })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.mealPlan(householdId) })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.products(householdId) })
     }
 
     const channel = supabase
@@ -81,6 +84,36 @@ export function useHouseholdRealtime(householdId: string | undefined) {
           event: '*',
           schema: 'public',
           table: 'inventory_items',
+          filter: `household_id=eq.${householdId}`,
+        },
+        refreshHousehold,
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'recipes',
+          filter: `household_id=eq.${householdId}`,
+        },
+        refreshHousehold,
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'recipe_ingredients',
+          filter: `household_id=eq.${householdId}`,
+        },
+        refreshHousehold,
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'meal_plan_entries',
           filter: `household_id=eq.${householdId}`,
         },
         refreshHousehold,

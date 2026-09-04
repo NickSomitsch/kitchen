@@ -134,6 +134,23 @@ test('two members share live inventory while another household stays isolated', 
     const firstItem = first.locator('.inventory-table-wrap:visible tr, .inventory-card:visible').filter({ hasText: 'Realtime rice' })
     await expect(firstItem.getByText('2.5 kg')).toBeVisible({ timeout: 10_000 })
 
+    // Recipes score against what the kitchen actually holds, and plan alongside it.
+    await first.getByRole('link', { name: 'Recipes', exact: true }).click()
+    await expect(first.getByRole('heading', { name: 'Recipes' })).toBeVisible()
+    await first.getByRole('button', { name: 'Add recipe' }).click()
+    const recipeDialog = first.getByRole('dialog', { name: 'Add a recipe' })
+    await recipeDialog.getByLabel(/Recipe name/).fill('E2E rice bowl')
+    await recipeDialog.getByLabel('Ingredient 1 name').fill('Realtime rice')
+    await recipeDialog.getByLabel('Ingredient 1 amount').fill('1')
+    await recipeDialog.getByLabel('Ingredient 1 unit').selectOption('kg')
+    await recipeDialog.getByRole('button', { name: 'Add recipe' }).click()
+    const recipeCard = first.locator('.recipe-card').filter({ hasText: 'E2E rice bowl' })
+    await expect(recipeCard.getByText('All 1 ingredient in stock')).toBeVisible({ timeout: 10_000 })
+    await first.getByRole('link', { name: 'Plan', exact: true }).click()
+    await expect(first.getByRole('heading', { name: 'Meal plan' })).toBeVisible()
+    await first.getByRole('link', { name: 'Inventory', exact: true }).click()
+    await expect(first.getByRole('heading', { name: 'Inventory' })).toBeVisible()
+
     // A controlled production service worker plus IndexedDB snapshots survive a full offline reload.
     await first.reload()
     await expect(first.getByRole('heading', { name: 'Inventory' })).toBeVisible()

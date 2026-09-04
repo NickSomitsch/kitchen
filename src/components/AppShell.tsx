@@ -1,4 +1,4 @@
-import { AlertTriangle, Boxes, Cloud, Download, LogOut, RefreshCw, Settings, ShoppingCart, WifiOff } from 'lucide-react'
+import { AlertTriangle, Boxes, CalendarDays, ChefHat, Cloud, Download, LogOut, RefreshCw, Settings, ShoppingCart, WifiOff } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
@@ -92,6 +92,14 @@ export function AppShell({
             <span>Groceries</span>
             {activeGroceries.length ? <b className="nav-count">{activeGroceries.length}</b> : null}
             {lowStockGroceries ? <span className="sr-only">{lowStockGroceries} low-stock items</span> : null}
+          </NavLink>
+          <NavLink to="/recipes">
+            <ChefHat size={18} />
+            <span>Recipes</span>
+          </NavLink>
+          <NavLink to="/planner">
+            <CalendarDays size={18} />
+            <span>Plan</span>
           </NavLink>
           <NavLink to="/settings">
             <Settings size={18} />

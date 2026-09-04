@@ -27,6 +27,7 @@ import {
 } from '../api/kitchen'
 import { useAuth } from '../auth/AuthContext'
 import { AppShell } from '../components/AppShell'
+import { PreferencesCard } from '../components/PreferencesCard'
 import { TaxonomyManager } from '../components/TaxonomyManager'
 import { Button, ErrorNotice, LoadingScreen, Modal } from '../components/ui'
 import { useHousehold } from '../hooks/useHousehold'
@@ -126,6 +127,8 @@ export function SettingsPage() {
 
             <TaxonomyManager type="categories" householdId={householdId} values={categories.data ?? []} inventory={inventory.data ?? []} offline={offline} />
             <TaxonomyManager type="locations" householdId={householdId} values={locations.data ?? []} inventory={inventory.data ?? []} offline={offline} />
+
+            <PreferencesCard key={context.household.updated_at} household={context.household} offline={offline} />
 
             <section className="settings-card">
               <div className="settings-card-heading"><div><span className="settings-icon"><Users size={19} /></span><div><h2>Household members</h2><p>Every member has equal access to inventory and settings.</p></div></div><span className="count-badge">{members.data?.length ?? 0}</span></div>

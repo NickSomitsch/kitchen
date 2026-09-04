@@ -12,6 +12,8 @@ const InventoryPage = lazy(() => import('./pages/InventoryPage').then((module) =
 const GroceryPage = lazy(() => import('./pages/GroceryPage').then((module) => ({ default: module.GroceryPage })))
 const OnboardingPage = lazy(() => import('./pages/OnboardingPage').then((module) => ({ default: module.OnboardingPage })))
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then((module) => ({ default: module.SettingsPage })))
+const RecipesPage = lazy(() => import('./pages/RecipesPage').then((module) => ({ default: module.RecipesPage })))
+const PlannerPage = lazy(() => import('./pages/PlannerPage').then((module) => ({ default: module.PlannerPage })))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -72,6 +74,14 @@ export function App() {
               <Route
                 path="/grocery"
                 element={<ProtectedRoute><GroceryPage /></ProtectedRoute>}
+              />
+              <Route
+                path="/recipes"
+                element={<ProtectedRoute><RecipesPage /></ProtectedRoute>}
+              />
+              <Route
+                path="/planner"
+                element={<ProtectedRoute><PlannerPage /></ProtectedRoute>}
               />
               <Route
                 path="/settings"
