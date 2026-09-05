@@ -463,7 +463,7 @@ a { color: inherit; }
 
 .recipe-detail { display: flex; flex-direction: column; gap: 1.1rem; }
 .recipe-detail-head { display: flex; gap: 1rem; align-items: flex-start; }
-.recipe-detail-head img { width: 128px; height: 128px; object-fit: cover; border-radius: 13px; border: 1px solid var(--line); }
+.recipe-detail-head img, .recipe-detail-art { width: 128px; height: 128px; object-fit: cover; border-radius: 13px; border: 1px solid var(--line); flex: 0 0 auto; }
 .recipe-description { color: var(--muted); font-size: .85rem; line-height: 1.6; margin: 0 0 .55rem; }
 .recipe-facts { display: flex; flex-wrap: wrap; gap: .85rem; list-style: none; padding: 0; margin: 0 0 .55rem; color: #56675f; font-size: .76rem; }
 .recipe-facts li, .recipe-facts a { display: inline-flex; align-items: center; gap: .3rem; }
@@ -546,6 +546,7 @@ a { color: inherit; }
 .suggestions > .notice, .suggestions > .inventory-skeleton { margin-top: .85rem; }
 .suggestion-list { list-style: none; padding: 0; margin: .9rem 0 0; display: flex; flex-direction: column; gap: .55rem; }
 .suggestion-list li { display: flex; align-items: center; gap: .9rem; padding: .8rem .9rem; border: 1px solid var(--line); border-radius: 13px; background: var(--paper); }
+.suggestion-art { width: 76px; height: 76px; flex: 0 0 76px; border-radius: 11px; border: 1px solid var(--line); }
 .suggestion-list li.has-conflict { border-color: #e4c3bd; }
 .suggestion-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .25rem; }
 .suggestion-title { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
@@ -573,12 +574,15 @@ a { color: inherit; }
 .overview-row-copy small { color: var(--muted); font-size: .7rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .overview-row-value { display: flex; flex-direction: column; align-items: flex-end; font-size: .8rem; font-weight: 750; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .overview-row-value small { font-size: .66rem; font-weight: 700; }
-.overview-groceries { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: .6rem; }
-.overview-groceries li { display: flex; flex-direction: column; gap: .12rem; }
-.overview-groceries small { color: #7d8983; font-size: .64rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; }
-.overview-groceries span { font-size: .81rem; line-height: 1.45; }
+.overview-groceries { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; }
+/* Rows carry the grocery page's own controls so ticking and editing behave identically. */
+.overview-groceries li { display: flex; align-items: center; gap: .6rem; padding: .42rem 0; border-top: 1px solid #f0f0eb; }
+.overview-groceries li:first-child { border-top: 0; }
+.overview-groceries .purchase-check { width: 30px; height: 30px; flex: 0 0 30px; }
+.overview-groceries .grocery-main > span:last-child { max-width: 100%; }
 .overview-recipes { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: .7rem; }
-.overview-recipes a { display: flex; flex-direction: column; gap: .32rem; text-decoration: none; color: inherit; }
+.overview-recipes a { display: grid; grid-template-columns: 54px 1fr; grid-template-rows: auto auto auto; column-gap: .7rem; row-gap: .3rem; align-items: center; text-decoration: none; color: inherit; }
+.overview-recipe-art { grid-row: 1 / -1; width: 54px; height: 54px; border-radius: 10px; border: 1px solid var(--line); }
 .overview-recipes strong { font-size: .86rem; }
 .overview-recipes small { display: flex; align-items: center; gap: .25rem; flex-wrap: wrap; color: var(--muted); font-size: .71rem; }
 .overview-note { margin: .7rem 0 0; color: var(--muted); font-size: .71rem; }
@@ -683,7 +687,7 @@ a { color: inherit; }
   .planner-day { display: grid; grid-template-columns: 92px 1fr 1fr; align-items: start; column-gap: .5rem; }
   .planner-day > header { grid-row: span 4; border-bottom: 0; border-right: 1px solid #ecece7; height: 100%; }
   .recipe-detail-head { flex-direction: column; }
-  .recipe-detail-head img { width: 100%; height: 160px; }
+  .recipe-detail-head img, .recipe-detail-art { width: 100%; height: 160px; }
 }
 
 @media (max-width: 640px) {
@@ -708,6 +712,7 @@ a { color: inherit; }
   .suggestions-head { flex-direction: column; }
   .suggestions-controls { width: 100%; justify-content: space-between; }
   .suggestion-list li { flex-direction: column; align-items: stretch; gap: .6rem; }
+  .suggestion-art { width: 100%; height: 116px; flex: 0 0 auto; }
   .suggestion-list li .button { width: 100%; }
   .suggestion-ingredients { white-space: normal; }
 }

@@ -21,6 +21,7 @@ import {
   queryKeys,
   setRecipeFavorite,
 } from '../api/kitchen'
+import { RecipeArt } from './RecipeArt'
 import { getErrorMessage } from '../lib/errors'
 import { formatExpiry } from '../lib/expiry'
 import { formatQuantity } from '../lib/inventory'
@@ -130,7 +131,14 @@ export function RecipeDetail({
       <header className="recipe-detail-head">
         {recipe.image_url ? (
           <img src={recipe.image_url} alt="" loading="lazy" referrerPolicy="no-referrer" />
-        ) : null}
+        ) : (
+          <RecipeArt
+            className="recipe-detail-art"
+            name={recipe.name}
+            tags={recipe.tags}
+            ingredients={recipe.ingredients.map((ingredient) => ingredient.name)}
+          />
+        )}
         <div>
           {recipe.description ? <p className="recipe-description">{recipe.description}</p> : null}
           <ul className="recipe-facts">

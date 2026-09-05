@@ -21,6 +21,7 @@ import {
   saveMealPlanEntry,
 } from '../api/kitchen'
 import { AppShell } from '../components/AppShell'
+import { RecipeArt } from '../components/RecipeArt'
 import { RecipeDetail } from '../components/RecipeDetail'
 import { RecipeForm } from '../components/RecipeForm'
 import { RecipeSuggestions } from '../components/RecipeSuggestions'
@@ -40,7 +41,11 @@ function RecipeCard({ match, onOpen }: { match: RecipeMatch; onOpen: () => void 
         {recipe.image_url ? (
           <img src={recipe.image_url} alt="" loading="lazy" referrerPolicy="no-referrer" />
         ) : (
-          <span className="recipe-thumb" aria-hidden="true"><ChefHat size={26} /></span>
+          <RecipeArt
+            name={recipe.name}
+            tags={recipe.tags}
+            ingredients={recipe.ingredients.map((ingredient) => ingredient.name)}
+          />
         )}
         <span className="recipe-card-body">
           <span className="recipe-card-title">

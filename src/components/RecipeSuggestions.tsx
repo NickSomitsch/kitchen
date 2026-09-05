@@ -11,6 +11,7 @@ import type {
   RecipeSuggestion,
   SuggestionResult,
 } from '../types/database'
+import { RecipeArt } from './RecipeArt'
 import { Button, ErrorNotice } from './ui'
 
 /**
@@ -179,6 +180,12 @@ export function RecipeSuggestions({
             const isSaved = saved.has(suggestion.name)
             return (
               <li key={suggestion.name} className={match.conflicts.length ? 'has-conflict' : ''}>
+                <RecipeArt
+                  className="suggestion-art"
+                  name={suggestion.name}
+                  tags={suggestion.tags}
+                  ingredients={suggestion.ingredients.map((ingredient) => ingredient.name)}
+                />
                 <div className="suggestion-body">
                   <div className="suggestion-title">
                     <strong>{suggestion.name}</strong>

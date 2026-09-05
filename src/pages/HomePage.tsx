@@ -3,6 +3,7 @@ import {
   ArrowRight,
   Boxes,
   CalendarClock,
+  Check,
   ChefHat,
   Clock,
   PackageOpen,
@@ -13,21 +14,29 @@ import {
 import { useMemo, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import {
+  fetchCategories,
   fetchGroceries,
   fetchInventory,
+  fetchLocations,
   fetchRecipes,
   queryKeys,
 } from '../api/kitchen'
 import { AppShell } from '../components/AppShell'
-import { ErrorNotice, LoadingScreen } from '../components/ui'
+import { GroceryItemForm } from '../components/GroceryItemForm'
+import { RecipeArt } from '../components/RecipeArt'
+import { PurchaseForm } from '../components/PurchaseForm'
+import { ErrorNotice, LoadingScreen, Modal } from '../components/ui'
 import { useHousehold } from '../hooks/useHousehold'
 import { getErrorMessage } from '../lib/errors'
 import { expiringItems, expiryState, formatExpiry } from '../lib/expiry'
 import { formatQuantity, groupActiveGroceries, isLowStock } from '../lib/inventory'
 import { coverageLabel, emptyRecipeFilters, rankRecipes } from '../lib/recipes'
-import type { InventoryItem } from '../types/database'
+import type { GroceryItem, InventoryItem } from '../types/database'
 
 type InventoryView = 'recent' | 'expiring'
+
+// Enough to be useful at a glance without turning the overview into a second list.
+const GROCERY_PREVIEW = 5
 
 function greeting(now = new Date()) {
   const hour = now.getHours()
@@ -63,6 +72,9 @@ function ItemRow({ item, view }: { item: InventoryItem; view: InventoryView }) {
 export function HomePage() {
   const household = useHousehold()
   const [view, setView] = useState<InventoryView>('recent')
+  const [formOpen, setFormOpen] = useState(false)
+  const [editingItem, setEditingItem] = useState<GroceryItem>()
+  const [purchasingItem, setPurchasingItem] = useState<GroceryItem>()
 
   const householdId = household.data?.household.id ?? ''
   const enabled = Boolean(householdId)
@@ -81,6 +93,16 @@ export function HomePage() {
     queryFn: () => fetchRecipes(householdId),
     enabled,
   })
+  const categories = useQuery({
+    queryKey: queryKeys.categories(householdId),
+    queryFn: () => fetchCategories(householdId),
+    enabled,
+  })
+  const locations = useQuery({
+    queryKey: queryKeys.locations(householdId),
+    queryFn: () => fetchLocations(householdId),
+    enabled,
+  })
 
   const items = useMemo(() => inventory.data ?? [], [inventory.data])
   const recent = useMemo(
@@ -94,8 +116,12 @@ export function HomePage() {
     () => (groceries.data ?? []).filter((entry) => entry.status === 'active'),
     [groceries.data],
   )
-  const groceryGroups = useMemo(
-    () => groupActiveGroceries(groceries.data ?? []).slice(0, 3),
+  // Grouped first so the order matches the grocery page, then flattened: the card
+  // shows individual items because each one has to be tickable and editable.
+  const groceryPreview = useMemo(
+    () => groupActiveGroceries(groceries.data ?? [])
+      .flatMap((group) => group.items)
+      .slice(0, GROCERY_PREVIEW),
     [groceries.data],
   )
   // Ranked from saved recipes rather than generated, so opening the home page
@@ -116,8 +142,21 @@ export function HomePage() {
 
   const shown = view === 'recent' ? recent : soon
   const loading = inventory.isLoading || groceries.isLoading || recipes.isLoading
+    || categories.isLoading || locations.isLoading
   const queryError = inventory.error ?? groceries.error ?? recipes.error
+    ?? categories.error ?? locations.error
   const lowStockCount = activeGroceries.filter((entry) => entry.source === 'low_stock').length
+  const allGroceries = groceries.data ?? []
+
+  function openGrocery(item: GroceryItem) {
+    setEditingItem(item)
+    setFormOpen(true)
+  }
+
+  function openExisting(id: string) {
+    const existing = allGroceries.find((item) => item.id === id)
+    if (existing) openGrocery(existing)
+  }
 
   return (
     <AppShell context={household.data}>
@@ -137,6 +176,7 @@ export function HomePage() {
         {queryError ? (
           <ErrorNotice message={getErrorMessage(queryError)} onRetry={() => {
             void inventory.refetch(); void groceries.refetch(); void recipes.refetch()
+            void categories.refetch(); void locations.refetch()
           }} />
         ) : loading ? (
           <div className="inventory-skeleton" aria-label="Loading your kitchen"><span /><span /><span /></div>
@@ -189,14 +229,38 @@ export function HomePage() {
               {activeGroceries.length ? (
                 <>
                   <ul className="overview-groceries">
-                    {groceryGroups.map((group) => (
-                      <li key={group.id ?? 'none'}>
-                        <small>{group.name}</small>
-                        <span>{group.items.slice(0, 4).map((entry) => entry.name).join(', ')}
-                          {group.items.length > 4 ? ` +${group.items.length - 4} more` : ''}</span>
+                    {groceryPreview.map((item) => (
+                      <li key={item.id}>
+                        <button
+                          className="purchase-check"
+                          onClick={() => setPurchasingItem(item)}
+                          aria-label={`Mark ${item.name} purchased`}
+                        >
+                          <Check size={17} />
+                        </button>
+                        <button className="grocery-main" onClick={() => openGrocery(item)}>
+                          <span className="grocery-title">
+                            <strong>{item.name}</strong>
+                            {item.source === 'low_stock' ? (
+                              <span className="auto-chip"><Sparkles size={12} /> Automatic</span>
+                            ) : null}
+                            {item.local_sync_status ? (
+                              <span className={`sync-chip sync-chip-${item.local_sync_status}`}>Pending sync</span>
+                            ) : null}
+                          </span>
+                          <span>
+                            {item.quantity && item.unit ? formatQuantity(item.quantity, item.unit) : 'Amount not set'}
+                            {item.category?.name ? ` · ${item.category.name}` : ''}
+                          </span>
+                        </button>
                       </li>
                     ))}
                   </ul>
+                  {activeGroceries.length > groceryPreview.length ? (
+                    <p className="overview-note">
+                      {activeGroceries.length - groceryPreview.length} more on the full list.
+                    </p>
+                  ) : null}
                   {lowStockCount ? (
                     <p className="overview-note">
                       {lowStockCount} added automatically by your low-stock rules.
@@ -220,6 +284,12 @@ export function HomePage() {
                   {topRecipes.map((match) => (
                     <li key={match.recipe.id}>
                       <Link to="/recipes">
+                        <RecipeArt
+                          className="overview-recipe-art"
+                          name={match.recipe.name}
+                          tags={match.recipe.tags}
+                          ingredients={match.recipe.ingredients.map((ingredient) => ingredient.name)}
+                        />
                         <strong>{match.recipe.name}</strong>
                         <span className={`coverage-bar coverage-${match.coverage === 1 ? 'full' : match.coverage >= 0.6 ? 'most' : 'few'}`}>
                           <span style={{ width: `${Math.round(match.coverage * 100)}%` }} />
@@ -261,6 +331,42 @@ export function HomePage() {
           </div>
         )}
       </div>
+
+      <Modal
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        title={editingItem ? 'Edit grocery item' : 'Add grocery item'}
+        description={editingItem?.source === 'low_stock'
+          ? 'This entry is managed by its inventory threshold; you can set the amount and notes.'
+          : 'Add something for everyone in your household to see.'}
+      >
+        <GroceryItemForm
+          householdId={householdId}
+          groceries={allGroceries}
+          inventory={items}
+          categories={categories.data ?? []}
+          item={editingItem}
+          onClose={() => setFormOpen(false)}
+          onExisting={openExisting}
+        />
+      </Modal>
+
+      <Modal
+        open={Boolean(purchasingItem)}
+        onClose={() => setPurchasingItem(undefined)}
+        title={`Purchased ${purchasingItem?.name ?? 'item'}?`}
+        description="Review the amount and decide whether to update your inventory."
+      >
+        {purchasingItem ? (
+          <PurchaseForm
+            householdId={householdId}
+            item={purchasingItem}
+            inventory={items}
+            locations={locations.data ?? []}
+            onClose={() => setPurchasingItem(undefined)}
+          />
+        ) : null}
+      </Modal>
     </AppShell>
   )
 }
