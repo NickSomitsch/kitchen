@@ -5,11 +5,11 @@ import { useAuth } from '../auth/AuthContext'
 import { supabase } from '../lib/supabase'
 
 export function useHousehold() {
-  const { user } = useAuth()
+  const { user, signedOut } = useAuth()
   return useQuery({
     queryKey: queryKeys.context,
     queryFn: () => fetchHouseholdContext(user!.id),
-    enabled: Boolean(user),
+    enabled: Boolean(user) && !signedOut,
   })
 }
 

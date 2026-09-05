@@ -2,8 +2,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, HashRouter } from 'react-router-dom'
 import { AuthProvider, useAuth } from './auth/AuthContext'
-import { LoadingScreen } from './components/ui'
+import { ErrorNotice, LoadingScreen } from './components/ui'
 import { useHousehold } from './hooks/useHousehold'
+import { getErrorMessage } from './lib/errors'
 import { isSupabaseConfigured } from './lib/supabase'
 import { OfflineProvider } from './offline/OfflineContext'
 
@@ -24,18 +25,31 @@ const queryClient = new QueryClient({
 })
 
 function HomeRoute() {
-  const { user, loading } = useAuth()
+  const { user, loading, signedOut } = useAuth()
   const household = useHousehold()
   if (loading) return <LoadingScreen />
-  if (!user) return <Navigate to="/auth" replace />
+  if (!user || signedOut) return <Navigate to="/auth" replace />
   if (household.isLoading) return <LoadingScreen />
+  // Only a lookup that succeeded and found nothing means there is no kitchen yet.
+  // Reading a failed request as "no kitchen" invites someone with a perfectly good
+  // household to build a second one on top of it.
+  if (household.isError) {
+    return (
+      <ErrorNotice
+        message={getErrorMessage(household.error)}
+        onRetry={() => void household.refetch()}
+      />
+    )
+  }
   return <Navigate to={household.data ? '/home' : '/onboarding'} replace />
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth()
+  const { user, loading, signedOut } = useAuth()
   if (loading) return <LoadingScreen />
-  if (!user) return <Navigate to="/auth" replace />
+  // A remembered user is enough to read the offline cache, but not to stay on a page
+  // whose session the server has already rejected.
+  if (!user || signedOut) return <Navigate to="/auth" replace />
   return children
 }
 

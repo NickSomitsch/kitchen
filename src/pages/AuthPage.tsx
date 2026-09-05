@@ -9,7 +9,7 @@ import { getAppUrl, supabase } from '../lib/supabase'
 type AuthMode = 'sign-in' | 'sign-up' | 'forgot' | 'update-password'
 
 export function AuthPage() {
-  const { user, loading, passwordRecovery, clearPasswordRecovery } = useAuth()
+  const { user, loading, signedOut, passwordRecovery, clearPasswordRecovery } = useAuth()
   const navigate = useNavigate()
   const [mode, setMode] = useState<AuthMode>('sign-in')
   const [displayName, setDisplayName] = useState('')
@@ -22,7 +22,9 @@ export function AuthPage() {
 
   const activeMode: AuthMode = passwordRecovery ? 'update-password' : mode
 
-  if (!loading && user && activeMode !== 'update-password') return <Navigate to="/" replace />
+  // `signedOut` matters here: the remembered user outlives the session, and without
+  // this check the guard sends them to sign in and this line sends them straight back.
+  if (!loading && user && !signedOut && activeMode !== 'update-password') return <Navigate to="/" replace />
 
   function switchMode(nextMode: AuthMode) {
     if (passwordRecovery) clearPasswordRecovery()
